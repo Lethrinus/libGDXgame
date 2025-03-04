@@ -1,6 +1,4 @@
-background.png
-bucket.png
-drop.mp3
-drop.png
+idle.png
 libgdx.png
-music.mp3
+walkanimation
+walkanimation.png
