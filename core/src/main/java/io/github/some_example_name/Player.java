@@ -56,9 +56,9 @@ public class Player {
         y = 0;
     }
 
-    /**
-     * Oyuncunun pozisyonunu ayarlar. 32x32 world'de ortalamak için (16,16) kullanılabilir.
-     */
+    //players position
+
+
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
@@ -113,7 +113,7 @@ public class Player {
 
     public void render(SpriteBatch batch) {
         TextureRegion frame = currentAnimation.getKeyFrame(stateTime, true);
-        // Render, oyuncunun (x,y) pozisyonunu merkez alacak şekilde yapılır.
+        // Render, centers the player to the camera
         batch.draw(frame, x - (frameWidth * scale) / 2f, y - (frameHeight * scale) / 2f, frameWidth * scale, frameHeight * scale);
     }
 

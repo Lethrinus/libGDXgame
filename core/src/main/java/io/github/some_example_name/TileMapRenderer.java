@@ -10,13 +10,13 @@ public class TileMapRenderer {
     private OrthogonalTiledMapRenderer renderer;
     private OrthographicCamera camera;
 
-    // 32 tile x 32 tile, her tile 32x32 piksel, unitScale = 1/32f olduğundan world unit olarak 32x32 olur.
+
     private float mapWidth, mapHeight;
     private final float unitScale = 1f / 32f;
 
     public TileMapRenderer(OrthographicCamera camera) {
         this.camera = camera;
-        // Tilemap dosyanızı yükleyin (Tiled'de width=32, height=32, tilewidth=32, tileheight=32 olduğundan emin olun)
+        // Tilemap file
         map = new TmxMapLoader().load("maps/tileset.tmx");
 
         // World biriminde harita boyutu: 32x32

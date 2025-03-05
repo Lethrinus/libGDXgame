@@ -15,7 +15,7 @@ public class Main extends ApplicationAdapter {
     private OrthographicCamera camera;
     private BitmapFont font;
 
-    // Harita boyutları (world unit olarak): 32×32
+    // world size as world unit
     private float mapWidth, mapHeight;
 
     @Override
@@ -23,7 +23,7 @@ public class Main extends ApplicationAdapter {
         batch = new SpriteBatch();
         font = new BitmapFont();
 
-        // Kamerayı oluşturun. Örneğin, 16x9 world unit viewport (görüntü alanı).
+        // camera creation 16x9
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
 
@@ -41,23 +41,23 @@ public class Main extends ApplicationAdapter {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        // Oyuncuyu güncelle (animasyon ve giriş dahil).
+        // update the player includes movement and animations
         player.update(delta);
 
-        // Kamerayı güncelle: oyuncuyu takip et, fakat kamera harita sınırlarına ulaştığında duracak.
+        //update the camera but until the tilemap borders
         updateCamera(delta);
 
-        // Ekranı temizle.
+        // clears the screen
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // SpriteBatch, kamera projeksiyonunu kullansın.
+        // camera projection
         batch.setProjectionMatrix(camera.combined);
 
-        // Tilemap'i renderla.
+        // render tilemap
         tileMapRenderer.render();
 
-        // Oyuncu ve FPS sayacını renderla.
+        // player and fps counter
         batch.begin();
         player.render(batch);
         font.draw(batch, "FPS: " + Gdx.graphics.getFramesPerSecond(),
@@ -66,19 +66,16 @@ public class Main extends ApplicationAdapter {
         batch.end();
     }
 
-    /**
-     * Kamera, oyuncuyu takip eder ancak tilemap sınırına geldiğinde kamera sabit kalır.
-     * Oyuncu sınırı aşsa bile kamera yer değiştirmez.
-     */
+    // camera update
     private void updateCamera(float delta) {
         float smoothing = 0.15f;
-        // Önce oyuncunun pozisyonuna doğru yumuşak geçiş (lerp) yap.
+        // to the player smooth lerp transition
         float targetX = player.getX();
         float targetY = player.getY();
         camera.position.x = MathUtils.lerp(camera.position.x, targetX, smoothing);
         camera.position.y = MathUtils.lerp(camera.position.y, targetY, smoothing);
 
-        // Kamera sınırları: viewport yarısı kadar kenardan içeride kalmalı.
+        // cam boundaries
         float halfW = camera.viewportWidth / 2f;
         float halfH = camera.viewportHeight / 2f;
         camera.position.x = MathUtils.clamp(camera.position.x, halfW, mapWidth - halfW);
