@@ -7,4 +7,10 @@ dependencies {
   if(enableGraalNative == 'true') {
     implementation "io.github.berstanio:gdx-svmhelper-annotations:$graalHelperVersion"
   }
+
+
+}
+repositories {
+  mavenCentral()
+  google()
 }

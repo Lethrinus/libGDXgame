@@ -1,4 +1,7 @@
 idle.png
 libgdx.png
+maps/tileset.tmx
+maps/zeo254-completed-commission.png
+maps/zeo254-completed-commission.tsx
 walkanimation
 walkanimation.png
