@@ -1,0 +1,13 @@
+knight_atlas.png
+size:2048,1024
+repeat:none
+attack_bottom
+bounds:2,396,1152,195
+attack_right
+bounds:2,593,1152,195
+attack_top
+bounds:2,199,1152,195
+idle_animation
+bounds:2,2,1152,195
+running_animation
+bounds:2,790,1152,195

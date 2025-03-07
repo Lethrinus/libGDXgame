@@ -1,0 +1,13 @@
+goblin_animations.png
+size:2048,1024
+repeat:none
+goblin_attackb
+bounds:2,386,1344,190
+goblin_attackr
+bounds:2,578,1344,190
+goblin_attacku
+bounds:2,770,1344,190
+goblin_idle
+bounds:2,194,1344,190
+goblin_running
+bounds:2,2,1344,190

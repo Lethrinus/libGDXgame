@@ -1,7 +1,10 @@
-idle.png
+Goblin/goblin_animations.atlas
+Goblin/goblin_animations.png
+Player/knight_atlas.atlas
+Player/knight_atlas.png
 libgdx.png
+maps/Tilemap_Flat.png
+maps/Tilemap_Flat.tsx
+maps/Tree.png
+maps/Tree.tsx
 maps/tileset.tmx
-maps/zeo254-completed-commission.png
-maps/zeo254-completed-commission.tsx
-walkanimation
-walkanimation.png
