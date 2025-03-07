@@ -2,8 +2,10 @@ package io.github.some_example_name;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 
@@ -28,6 +30,12 @@ public class Main extends ApplicationAdapter {
     public void create() {
         batch = new SpriteBatch();
 
+
+        Pixmap pixmap = new Pixmap(Gdx.files.internal("cursor.png"));
+        int hotspotX = 0;
+        int hotspotY = 0;
+        Cursor customCursor = Gdx.graphics.newCursor(pixmap, hotspotX, hotspotY);
+        Gdx.graphics.setCursor(customCursor);
         // 16×9 camera
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
@@ -46,6 +54,7 @@ public class Main extends ApplicationAdapter {
         goblin = new Goblin(camera, player,
             10, 10, // start position
             8, 12, 8, 12); // patrol range
+        pixmap.dispose();
     }
 
     @Override
