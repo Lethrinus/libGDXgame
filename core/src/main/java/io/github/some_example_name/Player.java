@@ -10,6 +10,10 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 public class Player {
     private float x, y;
     private float speed = 3.5f;
@@ -31,13 +35,23 @@ public class Player {
     private Animation<TextureRegion> currentAnimation;
     private boolean isAttacking = false;
 
+    // Dashing fields
+    private boolean isDashing = false;
+    private float dashTimeLeft = 0f;
+    private float dashSpeed = 10f;       // dash movement speed
+    private float dashDuration = 0.2f;   // dash lasts 0.2s
+    private float dashCooldown = 1.0f;   // 1s cooldown between dashes
+    private float dashCooldownTimer = 0f;
+
+    // Ghost trail
+    private List<GhostFrame> ghosts = new ArrayList<>();
+
     // Atlas frames
     private int frameWidth, frameHeight;
     private float scale = 1.0f / 72f;
     private static final int NUM_FRAMES = 6;
 
-    // We'll define a bounding box around the player
-    // about 0.6 wide × 0.6 tall, but you can tweak:
+    // bounding box for collision
     private static final float COLLISION_W = 0.6f;
     private static final float COLLISION_H = 0.6f;
 
@@ -52,11 +66,11 @@ public class Player {
         atlas = new Texture(Gdx.files.internal("Player/knight_atlas.png"));
 
         // Single-row subregions
-        TextureRegion idleRegion        = new TextureRegion(atlas, 2,   2,   1152, 195);
-        TextureRegion attackTopRegion   = new TextureRegion(atlas, 2,  199,  1152, 195);
-        TextureRegion attackBottomRegion= new TextureRegion(atlas, 2,  396,  1152, 195);
-        TextureRegion attackRightRegion = new TextureRegion(atlas, 2,  593,  1152, 195);
-        TextureRegion runRightRegion    = new TextureRegion(atlas, 2,  790,  1152, 195);
+        TextureRegion idleRegion         = new TextureRegion(atlas, 2,   2,   1152, 195);
+        TextureRegion attackTopRegion    = new TextureRegion(atlas, 2,  199,  1152, 195);
+        TextureRegion attackBottomRegion = new TextureRegion(atlas, 2,  396,  1152, 195);
+        TextureRegion attackRightRegion  = new TextureRegion(atlas, 2,  593,  1152, 195);
+        TextureRegion runRightRegion     = new TextureRegion(atlas, 2,  790,  1152, 195);
 
         frameWidth  = 1152 / NUM_FRAMES; // 192
         frameHeight = 195;
@@ -105,6 +119,37 @@ public class Player {
     }
 
     public void update(float delta) {
+
+        // 1) Update dash cooldown
+        if(dashCooldownTimer > 0f){
+            dashCooldownTimer -= delta;
+            if(dashCooldownTimer < 0f) dashCooldownTimer = 0f;
+        }
+
+        // 2) Check for dash input if not dashing & off cooldown
+        if(!isDashing && dashCooldownTimer <= 0f) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+                // Start dash
+                startDash();
+            }
+        }
+
+        // 3) If currently dashing, update dash time
+        if (isDashing) {
+            dashTimeLeft -= delta;
+            if (dashTimeLeft <= 0f) {
+                // dash ended
+                isDashing = false;
+                dashCooldownTimer = dashCooldown;
+            } else {
+                // spawn a ghost trail each frame
+                spawnGhostImage();
+            }
+        }
+
+        // 4) Decide movement speed
+        float moveSpeed = isDashing ? dashSpeed : speed;
+
         // Attack anim in progress?
         if (isAttacking && !currentAnimation.isAnimationFinished(stateTime)) {
             stateTime += delta;
@@ -114,14 +159,15 @@ public class Player {
             isAttacking = false;
         }
 
+        // 5) Movement input (WASD)
         float dx = 0, dy = 0;
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) dy+=1;
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) dy-=1;
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) dx+=1;
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) dx-=1;
+        if (Gdx.input.isKeyPressed(Input.Keys.W)) dy += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.S)) dy -= 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.D)) dx += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.A)) dx -= 1;
 
-        // Diagonal => normalize
-        if(dx!=0 && dy!=0){
+        // normalize diagonal
+        if(dx != 0 && dy != 0) {
             dx *= 0.7071f;
             dy *= 0.7071f;
         }
@@ -129,10 +175,11 @@ public class Player {
         float oldX = x;
         float oldY = y;
 
-        x += dx * speed * delta;
-        y += dy * speed * delta;
+        // 6) Apply movement speed
+        x += dx * moveSpeed * delta;
+        y += dy * moveSpeed * delta;
 
-        // Collisions with bounding box
+        // 7) Collisions with bounding box
         if (checkCollisionRect(x - COLLISION_W/2f, y - COLLISION_H/2f,
             COLLISION_W, COLLISION_H)) {
             // blocked => revert
@@ -140,12 +187,11 @@ public class Player {
             y = oldY;
         }
 
-        // Attack
+        // 8) Attack with left click
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             isAttacking = true;
             stateTime = 0f;
 
-            // screen->world
             Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
             camera.unproject(mousePos);
 
@@ -167,36 +213,83 @@ public class Player {
         }
         else {
             // Movement animation vs. idle
-            if(dx!=0 || dy!=0){
-                if(dx<0) currentAnimation = runningLeft;
-                else if(dx>0) currentAnimation = runningRight;
-                else currentAnimation = runningRight;
-            } else {
+            if(dx != 0 || dy != 0){
+                if(dx < 0)      currentAnimation = runningLeft;
+                else if(dx > 0) currentAnimation = runningRight;
+                else            currentAnimation = runningRight;
+            }
+            else {
                 currentAnimation = idleAnimation;
             }
         }
 
+        // 9) Update ghosts
+        updateGhosts(delta);
+
+        // 10) Advance time
         stateTime += delta;
     }
 
-    public void render(SpriteBatch batch) {
-        TextureRegion frame = currentAnimation.getKeyFrame(stateTime);
-        float drawW = frameWidth*scale;
-        float drawH = frameHeight*scale;
-        // Center the sprite
-        batch.draw(frame, x - drawW/2f, y - drawH/2f, drawW, drawH);
-    }
-
-    public void dispose() {
-        atlas.dispose();
+    /**
+     * Start a dash: set isDashing, dashTime, spawn an initial ghost if wanted.
+     */
+    private void startDash(){
+        isDashing = true;
+        dashTimeLeft = dashDuration;
+        spawnGhostImage();
     }
 
     /**
-     * Check if a rectangle (rx, ry, rw, rh)
-     * overlaps any "blocked" tile in collision layer=1.
+     * Spawn a "ghost" with the current frame, position.
+     */
+    private void spawnGhostImage() {
+        TextureRegion frame = currentAnimation.getKeyFrame(stateTime);
+        GhostFrame gf = new GhostFrame();
+        gf.x = x;
+        gf.y = y;
+        gf.region = new TextureRegion(frame);
+        gf.alpha = 0.6f;
+        gf.timeToLive = 0.3f;
+        ghosts.add(gf);
+    }
+
+    /**
+     * Fade out ghost frames, remove them when fully faded.
+     */
+    private void updateGhosts(float delta) {
+        Iterator<GhostFrame> it = ghosts.iterator();
+        while (it.hasNext()) {
+            GhostFrame g = it.next();
+            g.timeToLive -= delta;
+            float fadeRate = 1f / 0.1f;
+            g.alpha -= fadeRate * delta;
+            if (g.timeToLive <= 0f || g.alpha <= 0f) {
+                it.remove();
+            }
+        }
+    }
+
+    public void render(SpriteBatch batch) {
+        // 1) Draw ghost frames behind the player
+        for (GhostFrame ghost : ghosts) {
+            float w = ghost.region.getRegionWidth()  * scale;
+            float h = ghost.region.getRegionHeight() * scale;
+            batch.setColor(1f, 1f, 1f, ghost.alpha);
+            batch.draw(ghost.region, ghost.x - w/2f, ghost.y - h/2f, w, h);
+        }
+        batch.setColor(1f,1f,1f,1f);
+
+        // 2) Draw the player
+        TextureRegion frame = currentAnimation.getKeyFrame(stateTime);
+        float drawW = frame.getRegionWidth()  * scale;
+        float drawH = frame.getRegionHeight() * scale;
+        batch.draw(frame, x - drawW/2f, y - drawH/2f, drawW, drawH);
+    }
+
+    /**
+     * Collisions: check if (rx, ry, rw, rh) covers any "blocked" tile in layer=1.
      */
     private boolean checkCollisionRect(float rx, float ry, float rw, float rh) {
-        // Find integer tile coords that rectangle covers
         int startX = (int)Math.floor(rx);
         int endX   = (int)Math.floor(rx + rw);
         int startY = (int)Math.floor(ry);
@@ -210,5 +303,13 @@ public class Player {
             }
         }
         return false;
+    }
+
+    // simple struct for "ghost" frames
+    private static class GhostFrame {
+        float x, y;
+        TextureRegion region;
+        float alpha;
+        float timeToLive;
     }
 }

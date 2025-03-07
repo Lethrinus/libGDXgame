@@ -2,68 +2,82 @@ package io.github.some_example_name;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 
+/**
+ * Main entry point. Sets up camera, tileMap, player, goblin,
+ * and renders with partial transparency on the TreeTop layer.
+ */
 public class Main extends ApplicationAdapter {
     private SpriteBatch batch;
     private Player player;
+    private Goblin goblin;
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
 
+    // world size
     private float mapWidth, mapHeight;
 
-    // The radius for semi-transparency around the player's center
+    // The radius for the partial fade around the player in the TreeTop layer
     private static final float TREE_FADE_RADIUS = 1.2f;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
 
-        // 16×9 in world coords
+        // 16×9 camera
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
+        camera.update();
 
+        // Load tilemap
         tileMapRenderer = new TileMapRenderer(camera);
-        mapWidth = tileMapRenderer.getMapWidth();
-        mapHeight= tileMapRenderer.getMapHeight();
+        mapWidth  = tileMapRenderer.getMapWidth();
+        mapHeight = tileMapRenderer.getMapHeight();
 
-        // Player
+        // Create player
         player = new Player(camera, tileMapRenderer);
-        player.setPosition(16, 9); // near center
+        player.setPosition(16, 9); // center
+
+        // Create a goblin that patrols an area
+        goblin = new Goblin(camera, player,
+            10, 10, // start position
+            8, 12, 8, 12); // patrol range
     }
 
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        // update
+        // Update
         player.update(delta);
+        goblin.update(delta);
         updateCamera(delta);
 
-        // clear
+        // Clear screen
         Gdx.gl.glClearColor(0,0,0,1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // 1) Layers 0..1 => ground + collision
+        // 1) Render ground+collision layers (0,1)
         tileMapRenderer.renderBaseLayers(new int[]{0,1});
 
-        // 2) Draw player
+        // 2) Draw player & goblin
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         player.render(batch);
+        goblin.render(batch);
         batch.end();
 
-        // 3) "TreeTop" layer with circle shader
+        // 3) Render TreeTop layer (index=2) with circle fade
         tileMapRenderer.renderTreeTopWithShader(player, TREE_FADE_RADIUS);
     }
 
     private void updateCamera(float delta) {
+        // Smooth follow or clamp
         float smoothing = 0.15f;
-
         float targetX = player.getX();
         float targetY = player.getY();
 
@@ -82,7 +96,7 @@ public class Main extends ApplicationAdapter {
     @Override
     public void dispose() {
         batch.dispose();
-        player.dispose();
+        goblin.dispose();
         tileMapRenderer.dispose();
     }
 }
