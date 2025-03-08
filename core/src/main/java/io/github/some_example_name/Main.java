@@ -19,38 +19,36 @@ public class Main extends ApplicationAdapter {
     // World dimensions
     private float mapWidth, mapHeight;
 
-    // Radius for the partial fade effect on the TreeTop layer
     private static final float TREE_FADE_RADIUS = 1.2f;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
 
-        Pixmap pixmap = new Pixmap(Gdx.files.internal("cursor.png"));
-        int hotspotX = 0;
-        int hotspotY = 0;
-        Cursor customCursor = Gdx.graphics.newCursor(pixmap, hotspotX, hotspotY);
+        // Set a custom cursor (optional)
+        Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
+        int hotspotX = 0, hotspotY = 0;
+        Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, hotspotX, hotspotY);
         Gdx.graphics.setCursor(customCursor);
+        cursorPixmap.dispose();
 
-        // Create a 16x9 aspect ratio camera
+        // Create a camera with a 16:9 aspect ratio
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
         camera.update();
 
-        // Load the tile map
+        // Initialize tile map renderer
         tileMapRenderer = new TileMapRenderer(camera);
         mapWidth = tileMapRenderer.getMapWidth();
         mapHeight = tileMapRenderer.getMapHeight();
 
-        // Create the player and set its starting position (center of the map)
+        // Create player and goblin
         player = new Player(camera, tileMapRenderer);
         player.setPosition(16, 9);
+        goblin = new Goblin(camera, player, 10, 10, 8, 12, 8, 12);
 
-        // Create a goblin that patrols within a designated area
-        goblin = new Goblin(camera, player,
-            10, 10,  // starting position
-            8, 12, 8, 12); // patrol boundaries
-        pixmap.dispose();
+        // Set the target goblin for the player so that attacks apply damage
+        player.setTargetGoblin(goblin);
     }
 
     @Override
@@ -66,20 +64,27 @@ public class Main extends ApplicationAdapter {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Render base layers (Ground and Collision layers: indices 0 and 1)
+        // Render base tile map layers
         tileMapRenderer.renderBaseLayers(new int[]{0, 1});
 
-        // Render the player and goblin
+        // Render sprites: draw goblin first, then player (so player is on top)
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        player.render(batch);
         goblin.render(batch);
+        player.render(batch);
         batch.end();
 
-        // Render the TreeTop layer with a circle fade shader (layer index 2)
+        // Render health bars in a separate batch (goblin first, then player)
+        batch.begin();
+        goblin.renderHealthBar(batch);
+        player.renderHealthBar(batch);
+        batch.end();
+
+        // Render tree top layer with shader (if applicable)
         tileMapRenderer.renderTreeTopWithShader(player, TREE_FADE_RADIUS);
     }
 
+    // Smoothly update the camera to follow the player while clamping within world boundaries
     private void updateCamera(float delta) {
         float smoothing = 0.03f;
         float targetX = player.getX();
