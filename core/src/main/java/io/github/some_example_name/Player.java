@@ -19,7 +19,7 @@ public class Player {
     private float x, y;
     private float speed = 3.5f;
 
-    // Separate timers for movement and attack animations
+    // Timers for movement and attack animations
     private float movementStateTime = 0f;
     private float attackStateTime = 0f;
 
@@ -53,8 +53,8 @@ public class Player {
     private float dashCooldownTimer = 0f;
 
     // Ghost trail constants
-    private static final float GHOST_INITIAL_ALPHA = 0.8f;
-    private static final float GHOST_INITIAL_TIME = 0.4f;
+    private static final float GHOST_INITIAL_ALPHA = 0.4f;
+    private static final float GHOST_INITIAL_TIME = 0.15f;
 
     // Ghost trail container
     private static class GhostFrame {
@@ -85,18 +85,16 @@ public class Player {
     private float redFlashDuration = 0.2f;
     private float redFlashTimer = 0f;
 
-    // Knockback vector (increased multiplier)
+    // Knockback vector
     private Vector2 knockback = new Vector2(0, 0);
     private float knockbackDecay = 5f;
 
     // Attack-related fields
-    // Target goblin (should be set from Main using setTargetGoblin)
     private Goblin targetGoblin;
     private boolean attackExecuted = false;
-    private float attackHitTime = 0.15f;   // Time when damage is applied
-    private float attackDuration = 0.4f;   // Total duration of the attack animation
+    private float attackHitTime = 0.15f;
+    private float attackDuration = 0.4f;
     private float attackDamage = 20f;
-    // Increased knockback force for attack (4f)
     private float attackKnockbackForce = 4f;
     private float attackRange = 1.5f;
 
@@ -106,10 +104,9 @@ public class Player {
     public Player(OrthographicCamera camera, TileMapRenderer tileMapRenderer) {
         this.camera = camera;
         this.tileMapRenderer = tileMapRenderer;
-
         atlas = new Texture(Gdx.files.internal("Player/knight_atlas.png"));
 
-        // Define subregions (positions and sizes assumed)
+        // Define subregions for animations
         TextureRegion idleRegion         = new TextureRegion(atlas, 2, 2, 1152, 195);
         TextureRegion attackTopRegion    = new TextureRegion(atlas, 2, 199, 1152, 195);
         TextureRegion attackBottomRegion = new TextureRegion(atlas, 2, 396, 1152, 195);
@@ -134,7 +131,7 @@ public class Player {
         x = 16;
         y = 9;
 
-        // Create a simple white texture for health bar rendering
+        // Create a simple white texture for the health bar
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmap.setColor(Color.WHITE);
         pixmap.fill();
@@ -163,29 +160,51 @@ public class Player {
         return anim;
     }
 
+    /**
+     * Sets the player's position.
+     */
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
     }
 
-    // Set the target goblin (call from Main)
+    /**
+     * Sets the target goblin for attack interactions.
+     */
     public void setTargetGoblin(Goblin goblin) {
         this.targetGoblin = goblin;
     }
 
-    // Apply damage to the player along with knockback and red flash effect
+    /**
+     * Updates the TileMapRenderer reference (used when changing maps).
+     */
+    public void setTileMapRenderer(TileMapRenderer tileMapRenderer) {
+        this.tileMapRenderer = tileMapRenderer;
+    }
+
+    /**
+     * Checks if the player is currently in a bush cell.
+     */
+    public boolean isInBush() {
+        int tileX = (int) Math.floor(x);
+        int tileY = (int) Math.floor(y);
+        return tileMapRenderer.isCellBush(tileX, tileY);
+    }
+
+    /**
+     * Applies damage, knockback, and red flash effect to the player.
+     */
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
         if (health < 0) health = 0;
         float angleRad = MathUtils.degreesToRadians * angleDegrees;
-        // Increased knockback multiplier (1.5x)
         knockback.set(knockbackForce * MathUtils.cos(angleRad) * 1.5f,
             knockbackForce * MathUtils.sin(angleRad) * 1.5f);
         redFlashTimer = redFlashDuration;
     }
 
     public void update(float delta) {
-        // Handle dashing cooldown and duration
+        // Handle dash cooldown and duration
         if (dashCooldownTimer > 0f) {
             dashCooldownTimer -= delta;
             if (dashCooldownTimer < 0f) dashCooldownTimer = 0f;
@@ -242,7 +261,6 @@ public class Player {
             if (attackStateTime >= attackDuration) {
                 isAttacking = false;
             }
-            // During attack, do not process movement
             return;
         }
 
@@ -281,7 +299,7 @@ public class Player {
             currentMovementAnim = facingRight ? idleAnimation : idleAnimationLeft;
         }
 
-        // Apply knockback effect if any
+        // Apply knockback effect
         if (knockback.len() > 0.01f) {
             x += knockback.x * delta;
             y += knockback.y * delta;
@@ -293,12 +311,9 @@ public class Player {
         movementStateTime += delta;
 
         if (redFlashTimer > 0) redFlashTimer -= delta;
-
-        // Update ghost trail frames
         updateGhosts(delta);
     }
 
-    // Spawn a ghost image of the current movement frame
     private void spawnGhostImage() {
         TextureRegion frame = currentMovementAnim.getKeyFrame(movementStateTime);
         GhostFrame gf = new GhostFrame();
@@ -310,10 +325,8 @@ public class Player {
         ghosts.add(gf);
     }
 
-    // Update ghost frames: fade them out linearly over their lifetime
     private void updateGhosts(float delta) {
         java.util.Iterator<GhostFrame> it = ghosts.iterator();
-        // Calculate fade rate so that alpha reaches 0 when timeToLive expires
         float fadeRate = GHOST_INITIAL_ALPHA / GHOST_INITIAL_TIME;
         while (it.hasNext()) {
             GhostFrame g = it.next();
@@ -325,7 +338,6 @@ public class Player {
         }
     }
 
-    // Helper: create a polygon from a rectangle
     private Polygon createRectanglePolygon(Rectangle rect) {
         float[] vertices = new float[] {
             rect.x, rect.y,
@@ -336,7 +348,9 @@ public class Player {
         return new Polygon(vertices);
     }
 
-    // Render the player sprite and ghost trail
+    /**
+     * Renders the player and ghost trail.
+     */
     public void render(SpriteBatch batch) {
         TextureRegion frame;
         if (isAttacking) {
@@ -355,10 +369,9 @@ public class Player {
             batch.draw(ghost.region, ghost.x - w / 2f, ghost.y - h / 2f, w, h);
         }
         batch.setColor(1, 1, 1, 1);
-
         batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
 
-        // Draw red flash overlay on the player when hit
+        // Draw red flash overlay when hit
         if (redFlashTimer > 0) {
             batch.setColor(1, 0, 0, 0.3f);
             batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
@@ -366,7 +379,9 @@ public class Player {
         }
     }
 
-    // Render the player's health bar (should be drawn on top in a separate batch)
+    /**
+     * Renders the player's health bar.
+     */
     public void renderHealthBar(SpriteBatch batch) {
         float barWidth = 1f;
         float barHeight = 0.1f;
@@ -376,6 +391,9 @@ public class Player {
         batch.setColor(1, 1, 1, 1);
     }
 
+    /**
+     * Disposes of player resources.
+     */
     public void dispose() {
         atlas.dispose();
         healthBarTexture.dispose();

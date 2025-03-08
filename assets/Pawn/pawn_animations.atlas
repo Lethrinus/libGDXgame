@@ -1,0 +1,5 @@
+pawn_animations.png
+size:2048,256
+repeat:none
+pawn_idle
+bounds:2,2,1152,186

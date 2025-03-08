@@ -12,7 +12,6 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 
 public class Goblin {
-
     private enum State { IDLE, PATROL, CHASE, ATTACK }
     private State state = State.PATROL;
 
@@ -29,7 +28,6 @@ public class Goblin {
 
     // Animations
     private Texture atlas;
-
     private Animation<TextureRegion> idleAnimation;
     private Animation<TextureRegion> runRight, runLeft;
     private Animation<TextureRegion> attackRight, attackLeft;
@@ -58,14 +56,13 @@ public class Goblin {
     private float attackHitTime = 0.15f;
     private float attackDuration = 0.4f;
     private float attackDamage = 10f;
-    // Increased knockback force for goblin's attack (3f)
     private float attackKnockbackForce = 3f;
 
-    // Red flash effect for goblin when hit
+    // Red flash effect
     private float redFlashDuration = 0.2f;
     private float redFlashTimer = 0f;
 
-    // If health reaches 0, goblin is dead
+    // Flag for death
     private boolean isDead = false;
 
     public float getX() { return x; }
@@ -79,7 +76,6 @@ public class Goblin {
         this.player = player;
         this.x = startX;
         this.y = startY;
-
         this.patrolMinX = patrolMinX;
         this.patrolMaxX = patrolMaxX;
         this.patrolMinY = patrolMinY;
@@ -143,7 +139,9 @@ public class Goblin {
         patrolTargetY = MathUtils.random(patrolMinY, patrolMaxY);
     }
 
-    // Apply damage to the goblin; also set red flash timer; increase knockback multiplier
+    /**
+     * Applies damage, knockback, and red flash effect to the goblin.
+     */
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
         if (health < 0) health = 0;
@@ -156,7 +154,7 @@ public class Goblin {
     public void update(float delta) {
         if (isDead) return;
 
-        // Attack processing: if attacking, update attack timer and apply damage to player once
+        // Handle attack processing
         if (isAttacking) {
             attackStateTime += delta;
             if (!attackExecuted && attackStateTime >= attackHitTime) {
@@ -179,7 +177,11 @@ public class Goblin {
         float dxP = player.getX() - x;
         float dyP = player.getY() - y;
         float distToPlayer = (float)Math.sqrt(dxP*dxP + dyP*dyP);
-        if (distToPlayer < attackRadius) {
+
+        // If the player is hidden in a bush, switch to PATROL mode
+        if (player.isInBush()) {
+            state = State.PATROL;
+        } else if (distToPlayer < attackRadius) {
             if (!isAttacking) {
                 isAttacking = true;
                 attackStateTime = 0f;
@@ -225,7 +227,6 @@ public class Goblin {
         movementStateTime += delta;
         if (redFlashTimer > 0) redFlashTimer -= delta;
 
-        // If health reaches zero, mark goblin as dead
         if (health <= 0) {
             isDead = true;
         }
@@ -243,7 +244,9 @@ public class Goblin {
         y += ny * moveSpeed * delta;
     }
 
-    // Render the goblin sprite (if not dead)
+    /**
+     * Renders the goblin sprite and its red flash overlay when hit.
+     */
     public void render(SpriteBatch batch) {
         if (isDead) return;
         TextureRegion frame;
@@ -256,7 +259,6 @@ public class Goblin {
         float drawH = frame.getRegionHeight() * scale;
         batch.draw(frame, x - drawW/2f, y - drawH/2f, drawW, drawH);
 
-        // Draw red flash overlay when goblin is hit
         if (redFlashTimer > 0) {
             batch.setColor(1, 0, 0, 0.3f);
             batch.draw(frame, x - drawW/2f, y - drawH/2f, drawW, drawH);
@@ -264,7 +266,9 @@ public class Goblin {
         }
     }
 
-    // Render the goblin's health bar (should be drawn in a separate batch)
+    /**
+     * Renders the goblin's health bar.
+     */
     public void renderHealthBar(SpriteBatch batch) {
         if (isDead) return;
         float barWidth = 1f;
@@ -275,6 +279,9 @@ public class Goblin {
         batch.setColor(1, 1, 1, 1);
     }
 
+    /**
+     * Disposes of goblin resources.
+     */
     public void dispose() {
         atlas.dispose();
         healthBarTexture.dispose();

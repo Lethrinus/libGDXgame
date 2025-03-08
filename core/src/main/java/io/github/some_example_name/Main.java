@@ -16,38 +16,38 @@ public class Main extends ApplicationAdapter {
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
 
-    // World dimensions
+    // world sizes
     private float mapWidth, mapHeight;
 
     private static final float TREE_FADE_RADIUS = 1.2f;
-
+    private static final float BUSH_FADE_RADIUS = 0.6f;
     @Override
     public void create() {
         batch = new SpriteBatch();
 
-        // Set a custom cursor (optional)
+        // custom cursor
         Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
         int hotspotX = 0, hotspotY = 0;
         Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, hotspotX, hotspotY);
         Gdx.graphics.setCursor(customCursor);
         cursorPixmap.dispose();
 
-        // Create a camera with a 16:9 aspect ratio
+        // 16:9 camera creation
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
         camera.update();
 
-        // Initialize tile map renderer
+        // default map loading
         tileMapRenderer = new TileMapRenderer(camera);
         mapWidth = tileMapRenderer.getMapWidth();
         mapHeight = tileMapRenderer.getMapHeight();
 
-        // Create player and goblin
+        // player and goblin create
         player = new Player(camera, tileMapRenderer);
         player.setPosition(16, 9);
         goblin = new Goblin(camera, player, 10, 10, 8, 12, 8, 12);
 
-        // Set the target goblin for the player so that attacks apply damage
+        // giving player reference to the goblin
         player.setTargetGoblin(goblin);
     }
 
@@ -55,36 +55,51 @@ public class Main extends ApplicationAdapter {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        // Update game objects
+        // map change with M key ( wip )
+        if (Gdx.input.isKeyJustPressed(com.badlogic.gdx.Input.Keys.M)) {
+            // close current map renderer
+            tileMapRenderer.dispose();
+            // new map loading
+            tileMapRenderer = new TileMapRenderer(camera, "maps/another_map.tmx");
+            mapWidth = tileMapRenderer.getMapWidth();
+            mapHeight = tileMapRenderer.getMapHeight();
+            // player renderer reference
+            player.setTileMapRenderer(tileMapRenderer);
+        }
+
+        // game objects update
         player.update(delta);
         goblin.update(delta);
         updateCamera(delta);
 
-        // Clear the screen
+        // screen clear
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Render base tile map layers
+        // Base layers render (Ground, Collision, Bush)
         tileMapRenderer.renderBaseLayers(new int[]{0, 1});
 
-        // Render sprites: draw goblin first, then player (so player is on top)
+        // sprite rendering (goblin before , after player)
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         goblin.render(batch);
         player.render(batch);
         batch.end();
 
-        // Render health bars in a separate batch (goblin first, then player)
+        // health bar render
         batch.begin();
         goblin.renderHealthBar(batch);
         player.renderHealthBar(batch);
         batch.end();
 
-        // Render tree top layer with shader (if applicable)
+        // TreeTop layer with shader render
+        tileMapRenderer.renderBushWithShader(player, BUSH_FADE_RADIUS);
+
+        // after tree top layer render with shader
         tileMapRenderer.renderTreeTopWithShader(player, TREE_FADE_RADIUS);
     }
 
-    // Smoothly update the camera to follow the player while clamping within world boundaries
+    // follow camera with player
     private void updateCamera(float delta) {
         float smoothing = 0.03f;
         float targetX = player.getX();
