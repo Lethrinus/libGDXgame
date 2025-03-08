@@ -4,6 +4,8 @@ Player/knight_atlas.atlas
 Player/knight_atlas.png
 cursor.png
 libgdx.png
+maps/Bush.png
+maps/Bush.tsx
 maps/Tilemap_Flat.png
 maps/Tilemap_Flat.tsx
 maps/Tree.png
