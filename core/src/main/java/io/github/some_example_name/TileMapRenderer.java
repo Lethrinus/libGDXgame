@@ -3,17 +3,18 @@ package io.github.some_example_name;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import com.badlogic.gdx.maps.MapObject;
+import com.badlogic.gdx.maps.MapObjects;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.maps.tiled.TiledMapTile;
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer.Cell;
+import com.badlogic.gdx.maps.objects.PolygonMapObject;
+import com.badlogic.gdx.math.Intersector;
+import com.badlogic.gdx.math.Polygon;
 
-/**
- * Responsible for loading and rendering the Tiled map,
- * including the "tree top" layer with the circle shader.
- */
 public class TileMapRenderer {
     private TiledMap map;
     private OrthogonalTiledMapRenderer renderer;
@@ -22,16 +23,16 @@ public class TileMapRenderer {
     private float mapWidth, mapHeight;
     private final float unitScale = 1f / 32f;
 
-    // We'll create the circleShader once:
+    // Shader for circle fade on the TreeTop layer
     private ShaderProgram circleShader;
 
     public TileMapRenderer(OrthographicCamera camera) {
         this.camera = camera;
 
-        // Load your Tiled map (3 layers: 0=Ground,1=Collision,2=TreeTop)
+        // Load your Tiled map (3 layers: 0 = Ground, 1 = Collision, 2 = TreeTop)
         map = new TmxMapLoader().load("maps/tileset.tmx");
 
-        // Suppose 32×32 in world units
+        // Assuming the map has 32 x 32 tiles in world units
         mapWidth = 32f;
         mapHeight = 32f;
 
@@ -40,7 +41,7 @@ public class TileMapRenderer {
     }
 
     /**
-     * Render layers (e.g. {0,1}) normally (no special alpha).
+     * Render specified layers (e.g., layers 0 and 1) normally without special effects.
      */
     public void renderBaseLayers(int[] layerIndices) {
         renderer.setView(camera);
@@ -48,58 +49,78 @@ public class TileMapRenderer {
     }
 
     /**
-     * Renders the top layer (index=2) using a circle fade shader.
-     *  - If dist < radius => alpha=0.5
-     *  - else alpha=1.0
+     * Render the top layer (index = 2) using a circle fade shader.
+     * The shader sets alpha to 0.5 inside a given radius around the player,
+     * and 1.0 outside that radius.
      */
     public void renderTreeTopWithShader(Player player, float radius) {
-        // We assume layer=2 => "TreeTop"
         int[] layers = new int[]{2};
 
-        // Lazy init the circleShader
+        // Lazy initialization of the circle shader
         if (circleShader == null) {
             circleShader = ShaderManager.createCircleShader();
         }
 
         Batch batch = renderer.getBatch();
-        // Use the circle shader
         batch.setShader(circleShader);
 
-        // Pass uniforms
         circleShader.bind();
         circleShader.setUniformf("u_playerPos", player.getX(), player.getY());
         circleShader.setUniformf("u_radius", radius);
 
-        // Render
         renderer.setView(camera);
         renderer.render(layers);
 
-        // Reset
         batch.setShader(null);
     }
 
     /**
-     * For collisions with layer=1 (Collision).
-     * Now we only check the single tile at (x,y).
-     * The Player code will call this for each relevant tile in bounding box.
+     * Checks collision on the collision layer (layer index 1) using the collision shape.
+     * Instead of blocking the entire tile, it tests the player polygon against the collision shape
+     * defined inside the tile (via a property on the collision object).
+     *
+     * @param tileX The x index of the tile.
+     * @param tileY The y index of the tile.
+     * @param playerPoly The player's collision area as a polygon.
+     * @return True if a collision occurs, false otherwise.
      */
-    public boolean isCellBlocked(int tileX, int tileY) {
-        // Out of bounds => block
-        if(tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
+    public boolean isCellBlocked(int tileX, int tileY, Polygon playerPoly) {
+        // Out of bounds is considered blocked.
+        if (tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
             return true;
         }
 
-        // layer=1 => collision
         TiledMapTileLayer collisionLayer = (TiledMapTileLayer) map.getLayers().get(1);
         if (collisionLayer == null) return false;
 
         Cell cell = collisionLayer.getCell(tileX, tileY);
-        if(cell == null) return false;
+        if (cell == null) return false;
 
         TiledMapTile tile = cell.getTile();
-        if(tile == null) return false;
+        if (tile == null) return false;
 
-        return tile.getProperties().containsKey("blocked");
+        // Do not check the entire tile's properties; only check the collision shapes (objects)
+        MapObjects objects = tile.getObjects();
+        if (objects != null && objects.getCount() > 0) {
+            for (MapObject object : objects) {
+                if (object.getProperties().containsKey("blocked")) {
+                    if (object instanceof PolygonMapObject) {
+                        Polygon polygon = ((PolygonMapObject) object).getPolygon();
+                        // The polygon is defined in the tile's local coordinates.
+                        // Convert it to world coordinates by setting the tile's position.
+                        Polygon tilePoly = new Polygon(polygon.getVertices());
+                        tilePoly.setPosition(tileX, tileY);
+                        if (Intersector.overlapConvexPolygons(tilePoly, playerPoly)) {
+                            return true;
+                        }
+                    } else {
+                        // For other object types, default to blocking.
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public float getMapWidth() {
@@ -111,7 +132,6 @@ public class TileMapRenderer {
     }
 
     public void dispose() {
-        // Dispose resources
         if (circleShader != null) circleShader.dispose();
         renderer.dispose();
         map.dispose();
