@@ -1,11 +1,9 @@
 package io.github.some_example_name;
 
+
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.Cursor;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 
@@ -15,7 +13,11 @@ public class Main extends ApplicationAdapter {
     private Goblin goblin;
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
+    private Texture bushOverlayTexture;
 
+    private float overlayAlpha = 0f;
+    private final float targetOverlayAlpha = 0.3f;
+    private final float overlayTransitionSpeed = 1f;
     // world sizes
     private float mapWidth, mapHeight;
 
@@ -46,6 +48,14 @@ public class Main extends ApplicationAdapter {
         player = new Player(camera, tileMapRenderer);
         player.setPosition(16, 9);
         goblin = new Goblin(camera, player, 10, 10, 8, 12, 8, 12);
+
+
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pixmap.setColor(new Color(0, 0, 0, 1));
+        pixmap.fill();
+        bushOverlayTexture = new Texture(pixmap);
+        pixmap.dispose();
+
 
         // giving player reference to the goblin
         player.setTargetGoblin(goblin);
@@ -92,6 +102,36 @@ public class Main extends ApplicationAdapter {
         player.renderHealthBar(batch);
         batch.end();
 
+        if (player.isInBush()) {
+            tileMapRenderer.renderBushWithShader(player, BUSH_FADE_RADIUS);
+        } else {
+            // Eğer bush layer arka planı gereksiz yere kaplıyorsa, renderlamayı devre dışı bırakabilirsiniz.
+            // Alternatif olarak bush layer dokularının alfa değerlerini ayarlayabilirsiniz.
+            tileMapRenderer.renderBaseLayers(new int[]{2});
+        }
+        tileMapRenderer.renderTreeTopWithShader(player, TREE_FADE_RADIUS);
+
+        // Overlay alfa geçişi: oyuncu çalıdaysa artıyor, değilse azalıyor
+        if (player.isInBush()) {
+            overlayAlpha = Math.min(overlayAlpha + overlayTransitionSpeed * delta, targetOverlayAlpha);
+        } else {
+            overlayAlpha = Math.max(overlayAlpha - overlayTransitionSpeed * delta, 0f);
+        }
+
+
+        // Overlay çizimi: overlayAlpha > 0 ise tüm ekranı kaplar
+        if (overlayAlpha > 0f) {
+            batch.begin();
+            Color previousColor = batch.getColor();
+            batch.setColor(0, 0, 0, overlayAlpha);
+            batch.draw(bushOverlayTexture,
+                camera.position.x - camera.viewportWidth / 2,
+                camera.position.y - camera.viewportHeight / 2,
+                camera.viewportWidth, camera.viewportHeight);
+            batch.setColor(previousColor);
+            batch.end();
+        }
+
         // TreeTop layer with shader render
         tileMapRenderer.renderBushWithShader(player, BUSH_FADE_RADIUS);
 
@@ -121,6 +161,7 @@ public class Main extends ApplicationAdapter {
     public void dispose() {
         batch.dispose();
         goblin.dispose();
+        bushOverlayTexture.dispose();
         tileMapRenderer.dispose();
     }
 }
