@@ -22,3 +22,10 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+.gradle/8.12.1/executionHistory/executionHistory.bin
+.gradle/8.12.1/executionHistory/executionHistory.lock
+.gradle/8.12.1/fileHashes/fileHashes.bin
+.gradle/8.12.1/fileHashes/fileHashes.lock
+.gradle/buildOutputCleanup/buildOutputCleanup.lock
+build/reports/problems/problems-report.html
+core/build/tmp/compileJava/previous-compilation-data.bin
