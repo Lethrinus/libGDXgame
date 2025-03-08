@@ -86,7 +86,7 @@ public class Main extends ApplicationAdapter {
 
     private void updateCamera(float delta) {
         // Smooth follow or clamp
-        float smoothing = 0.15f;
+        float smoothing = 0.03f;
         float targetX = player.getX();
         float targetY = player.getY();
 
