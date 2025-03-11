@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 
 public class MainMenu extends ApplicationAdapter {
     private SpriteBatch batch;
@@ -19,7 +20,11 @@ public class MainMenu extends ApplicationAdapter {
         batch = new SpriteBatch();
         backgroundImage = new Texture(Gdx.files.internal("UI/Carved_9Slides.png"));
         ribbonImage = new Texture(Gdx.files.internal("UI/Ribbon_Blue_3Slides.png"));
-        font = new BitmapFont();
+        FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/Homer_Simpson_Revised.ttf"));
+        FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
+
+        font = generator.generateFont(parameter);
+        generator.dispose(); // Generator'ı serbest bırak
         font.getData().setScale(3); // Yazıyı büyüt
     }
 
