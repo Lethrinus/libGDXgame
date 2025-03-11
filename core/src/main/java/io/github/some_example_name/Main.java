@@ -53,12 +53,12 @@ public class Main extends ApplicationAdapter {
         goblin = new Goblin(camera, player, 11, 4.5f, 8, 12, 3, 6);
         player.setTargetGoblin(goblin);
 
-        // Create NPC at a different location
-        npc = new NPC(5, 6, new String[] {
-            "Hello adventurer!",
-            "Be careful out there.",
-            "Press to talk."
-        });
+        String[] npcLines = {
+            "hello adventurer!",
+            "be careful out there.",
+            "press e to talk."
+        };
+        npc = new NPC(5, 5, npcLines);
 
         // Create overlay texture for bush fade
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
