@@ -42,7 +42,7 @@ public class NPC {
 
     // Speech bubble dimensions in world units
     private float bubbleWidth = 4f;
-    private float bubbleHeight = 1.2f;
+    private float bubbleHeight = 1;
 
     // Idle animation for NPC (from pawn_animations.png)
     private Animation<TextureRegion> idleAnimation;

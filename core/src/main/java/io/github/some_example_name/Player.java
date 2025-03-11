@@ -107,9 +107,14 @@ public class Player {
     public float getX() { return x; }
     public float getY() { return y; }
 
+    private Inventory inventory;
+
     public Player(OrthographicCamera camera, TileMapRenderer tileMapRenderer) {
         this.camera = camera;
         this.tileMapRenderer = tileMapRenderer;
+        this.health = 100f;
+        this.maxHealth = 100f;
+        this.inventory = new Inventory();
         atlas = new Texture(Gdx.files.internal("Player/knight_atlas.png"));
 
         // Define subregions for animations
@@ -164,6 +169,22 @@ public class Player {
         Animation<TextureRegion> anim = new Animation<>(original.getFrameDuration(), mirrored);
         anim.setPlayMode(original.getPlayMode());
         return anim;
+    }
+
+    public void increaseHealth(float amount) {
+        health += amount;
+        if (health > maxHealth) {
+            health = maxHealth;
+        }
+    }
+    public float getHealth() {
+        return health;
+    }
+    public float getMaxHealth() {
+        return maxHealth;
+    }
+    public Inventory getInventory() {
+        return inventory;
     }
 
     /**
@@ -414,6 +435,7 @@ public class Player {
     public Texture getHealthBarTexture() {
         return healthBarTexture;
     }
+
 
     /**
      * Disposes of player resources.

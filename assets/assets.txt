@@ -1,11 +1,15 @@
 Goblin/goblin_animations.atlas
 Goblin/goblin_animations.png
+HUD/cursor.png
+HUD/inventory_bg.png
+HUD/meat.png
+HUD/slot_normal.png
+HUD/slot_selected.png
 Pawn/pawn_animations.atlas
 Pawn/pawn_animations.png
 Player/knight_atlas.atlas
 Player/knight_atlas.png
 bubble.png
-cursor.png
 deadanimation.atlas
 deadanimation.png
 fonts/Homer_Simpson_Revised.ttf

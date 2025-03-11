@@ -2,6 +2,7 @@ package io.github.some_example_name;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
@@ -20,7 +21,7 @@ public class Main extends ApplicationAdapter {
     private NPC npc;
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
-
+    private InventoryHUD hud;
     // Overlay for bush dim effect
     private Texture overlayTexture;
     private float overlayAlpha = 0f;          // current alpha
@@ -32,11 +33,14 @@ public class Main extends ApplicationAdapter {
         batch = new SpriteBatch();
 
         // Optional custom cursor
-        Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
+        Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("HUD/cursor.png"));
         Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, 0, 0);
         Gdx.graphics.setCursor(customCursor);
         cursorPixmap.dispose();
-
+        //hud
+        hud = new InventoryHUD();
+        hud.initializeCamera(1200, 800);
+        hud.loadTextures();
         // Camera: 16x9 world units
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
@@ -48,6 +52,10 @@ public class Main extends ApplicationAdapter {
         // Create player at center
         player = new Player(camera, tileMapRenderer);
         player.setPosition(8, 4.5f);
+        Texture meatTexture = new Texture("HUD/meat.png");
+        player.getInventory().addItem(new MeatItem("Meat",meatTexture, 25f));
+        player.getInventory().addItem(new MeatItem("Meat",meatTexture, 25f));
+
 
         // Create goblin
         goblin = new Goblin(camera, player, 11, 4.5f, 8, 12, 3, 6);
@@ -73,6 +81,7 @@ public class Main extends ApplicationAdapter {
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
+        handleInput();
 
         // Update logic
         player.update(delta);
@@ -102,6 +111,7 @@ public class Main extends ApplicationAdapter {
 
         // 3) Render Goblin first (so tree top can cover it)
         batch.setProjectionMatrix(camera.combined);
+
         batch.begin();
         goblin.render(batch);
         batch.end();
@@ -114,7 +124,13 @@ public class Main extends ApplicationAdapter {
             // Render tree top normally
             tileMapRenderer.renderTreeTopNoShader();
         }
-
+        //hud
+        if(Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            if(!player.getInventory().getItems().isEmpty()) {
+                Item firstItem = player.getInventory().getItems().get(0);
+                firstItem.use(player);
+            }
+        }
         // 5) Then render player and NPC
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
@@ -138,10 +154,12 @@ public class Main extends ApplicationAdapter {
 
         // 7) Draw UI (health bars, dash bar)
         batch.setProjectionMatrix(camera.combined);
+        hud.drawHUD(player);
         batch.begin();
         goblin.renderHealthBar(batch);
         player.renderHealthBar(batch);
         renderDashCooldown(batch);
+
         batch.end();
     }
 
@@ -187,6 +205,46 @@ public class Main extends ApplicationAdapter {
 
         camera.update();
     }
+    private void handleInput() {
+        // Sağ/sol ok tuşlarıyla slot değiştir
+        if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
+            hud.nextSlot();
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT)) {
+            hud.prevSlot();
+        }
+
+        // 1,2,3,4 tuşlarıyla doğrudan slot seçimi
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
+            hud.setSelectedSlot(0);
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) {
+            hud.setSelectedSlot(1);
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) {
+            hud.setSelectedSlot(2);
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) {
+            hud.setSelectedSlot(3);
+        }
+
+        // E tuşuna basılırsa seçili slottaki item'i kullan (yemek)
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            useSelectedItem();
+        }
+    }
+
+    private void useSelectedItem() {
+        int slotIndex = hud.getSelectedSlot();
+        // Envanterde yeterince item var mı diye bak
+        if (slotIndex < player.getInventory().getItems().size()) {
+            Item item = player.getInventory().getItems().get(slotIndex);
+            if (item != null) {
+                item.use(player);
+                // MeatItem ise can artıracak ve kendini remove edecektir.
+            }
+        }
+    }
 
     @Override
     public void dispose() {
@@ -195,6 +253,7 @@ public class Main extends ApplicationAdapter {
         goblin.dispose();
         npc.dispose();
         player.dispose();
+        hud.dispose();
         tileMapRenderer.dispose();
     }
 }
