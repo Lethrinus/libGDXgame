@@ -1,158 +1,189 @@
 package io.github.some_example_name;
 
-
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
 
+/**
+ * Main game class with:
+ *  - Gradual fade overlay when player is in a bush
+ *  - Conditional tree top shader if player is under tree tile
+ *  - Bigger dash bar in orange
+ */
 public class Main extends ApplicationAdapter {
     private SpriteBatch batch;
     private Player player;
     private Goblin goblin;
+    private NPC npc;
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
-    private Texture bushOverlayTexture;
 
-    private float overlayAlpha = 0f;
-    private final float targetOverlayAlpha = 0.3f;
-    private final float overlayTransitionSpeed = 1f;
-    // world sizes
-    private float mapWidth, mapHeight;
+    // Overlay for bush dim effect
+    private Texture overlayTexture;
+    private float overlayAlpha = 0f;          // current alpha
+    private final float overlayTarget = 0.3f; // max alpha
+    private final float overlayFadeSpeed = 1f; // how fast it fades in/out
 
-    private static final float TREE_FADE_RADIUS = 1.2f;
-    private static final float BUSH_FADE_RADIUS = 0.6f;
     @Override
     public void create() {
         batch = new SpriteBatch();
 
-        // custom cursor
+        // Optional custom cursor
         Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("cursor.png"));
-        int hotspotX = 0, hotspotY = 0;
-        Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, hotspotX, hotspotY);
+        Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, 0, 0);
         Gdx.graphics.setCursor(customCursor);
         cursorPixmap.dispose();
 
-        // 16:9 camera creation
+        // Camera: 16x9 world units
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
         camera.update();
 
-        // default map loading
-        tileMapRenderer = new TileMapRenderer(camera);
-        mapWidth = tileMapRenderer.getMapWidth();
-        mapHeight = tileMapRenderer.getMapHeight();
+        // Load tile map
+        tileMapRenderer = new TileMapRenderer(camera, "maps/tileset.tmx");
 
-        // player and goblin create
+        // Create player at center
         player = new Player(camera, tileMapRenderer);
-        player.setPosition(16, 9);
-        goblin = new Goblin(camera, player, 10, 10, 8, 12, 8, 12);
+        player.setPosition(8, 4.5f);
 
+        // Create goblin
+        goblin = new Goblin(camera, player, 11, 4.5f, 8, 12, 3, 6);
+        player.setTargetGoblin(goblin);
 
+        // Create NPC at a different location
+        npc = new NPC(5, 6, new String[] {
+            "Hello adventurer!",
+            "Be careful out there.",
+            "Press to talk."
+        });
+
+        // Create overlay texture for bush fade
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(new Color(0, 0, 0, 1));
+        pixmap.setColor(Color.WHITE);
         pixmap.fill();
-        bushOverlayTexture = new Texture(pixmap);
+        overlayTexture = new Texture(pixmap);
         pixmap.dispose();
 
-
-        // giving player reference to the goblin
-        player.setTargetGoblin(goblin);
+        Gdx.gl.glClearColor(0, 0, 0, 1);
     }
 
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        // map change with M key ( wip )
-        if (Gdx.input.isKeyJustPressed(com.badlogic.gdx.Input.Keys.M)) {
-            // close current map renderer
-            tileMapRenderer.dispose();
-            // new map loading
-            tileMapRenderer = new TileMapRenderer(camera, "maps/another_map.tmx");
-            mapWidth = tileMapRenderer.getMapWidth();
-            mapHeight = tileMapRenderer.getMapHeight();
-            // player renderer reference
-            player.setTileMapRenderer(tileMapRenderer);
-        }
-
-        // game objects update
+        // Update logic
         player.update(delta);
         goblin.update(delta);
+        npc.update(delta, new Vector2(player.getX(), player.getY()));
         updateCamera(delta);
 
-        // screen clear
-        Gdx.gl.glClearColor(0, 0, 0, 1);
+        // Clear screen
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Base layers render (Ground, Collision, Bush)
+        // 1) Render base layers (Ground, Collision)
         tileMapRenderer.renderBaseLayers(new int[]{0, 1});
 
-        // sprite rendering (goblin before , after player)
+        // 2) Render Bush layer (shader if in bush, else normal)
+        if (player.isInBush()) {
+            tileMapRenderer.renderBushWithShader(player, 50f);
+        } else {
+            tileMapRenderer.renderBushNoShader();
+        }
+
+        // Gradual fade for bush overlay
+        if (player.isInBush()) {
+            overlayAlpha = Math.min(overlayAlpha + overlayFadeSpeed * delta, overlayTarget);
+        } else {
+            overlayAlpha = Math.max(overlayAlpha - overlayFadeSpeed * delta, 0f);
+        }
+
+        // 3) Render Goblin first (so tree top can cover it)
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         goblin.render(batch);
-        player.render(batch);
         batch.end();
 
-        // health bar render
+        // 4) Check if player is under tree top tile
+        if (tileMapRenderer.isCellTreeTop((int)player.getX(), (int)player.getY())) {
+            // Use shader
+            tileMapRenderer.renderTreeTopWithShader(player, 90f);
+        } else {
+            // Render tree top normally
+            tileMapRenderer.renderTreeTopNoShader();
+        }
+
+        // 5) Then render player and NPC
+        batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        goblin.renderHealthBar(batch);
-        player.renderHealthBar(batch);
+        player.render(batch);
+        npc.render(batch);
         batch.end();
 
-        if (player.isInBush()) {
-            tileMapRenderer.renderBushWithShader(player, BUSH_FADE_RADIUS);
-        } else {
-            // Eğer bush layer arka planı gereksiz yere kaplıyorsa, renderlamayı devre dışı bırakabilirsiniz.
-            // Alternatif olarak bush layer dokularının alfa değerlerini ayarlayabilirsiniz.
-            tileMapRenderer.renderBaseLayers(new int[]{2});
-        }
-        tileMapRenderer.renderTreeTopWithShader(player, TREE_FADE_RADIUS);
-
-        // Overlay alfa geçişi: oyuncu çalıdaysa artıyor, değilse azalıyor
-        if (player.isInBush()) {
-            overlayAlpha = Math.min(overlayAlpha + overlayTransitionSpeed * delta, targetOverlayAlpha);
-        } else {
-            overlayAlpha = Math.max(overlayAlpha - overlayTransitionSpeed * delta, 0f);
-        }
-
-
-        // Overlay çizimi: overlayAlpha > 0 ise tüm ekranı kaplar
+        // 6) If overlayAlpha > 0, draw dim overlay for bush effect
         if (overlayAlpha > 0f) {
+            batch.setProjectionMatrix(camera.combined);
             batch.begin();
-            Color previousColor = batch.getColor();
             batch.setColor(0, 0, 0, overlayAlpha);
-            batch.draw(bushOverlayTexture,
+            batch.draw(overlayTexture,
                 camera.position.x - camera.viewportWidth / 2,
                 camera.position.y - camera.viewportHeight / 2,
-                camera.viewportWidth, camera.viewportHeight);
-            batch.setColor(previousColor);
+                camera.viewportWidth,
+                camera.viewportHeight);
+            batch.setColor(Color.WHITE);
             batch.end();
         }
 
-        // TreeTop layer with shader render
-        tileMapRenderer.renderBushWithShader(player, BUSH_FADE_RADIUS);
-
-        // after tree top layer render with shader
-        tileMapRenderer.renderTreeTopWithShader(player, TREE_FADE_RADIUS);
+        // 7) Draw UI (health bars, dash bar)
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        goblin.renderHealthBar(batch);
+        player.renderHealthBar(batch);
+        renderDashCooldown(batch);
+        batch.end();
     }
 
-    // follow camera with player
+    /**
+     * Renders a bigger dash cooldown bar in orange.
+     */
+    private void renderDashCooldown(SpriteBatch batch) {
+        float cooldown = player.getDashCooldown();
+        float timer = player.getDashCooldownTimer();
+        if (cooldown <= 0) return;
+
+        float percent = 1f - (timer / cooldown);
+        if (percent < 0f) percent = 0f;
+
+        // Make it bigger and orange
+        float barW = 2f;
+        float barH = 0.2f;
+        float barX = camera.position.x - camera.viewportWidth / 2f + 0.2f;
+        float barY = camera.position.y + camera.viewportHeight / 2f - 0.4f;
+
+        // Background in gray
+        batch.setColor(Color.GRAY);
+        batch.draw(player.getHealthBarTexture(), barX, barY, barW, barH);
+
+        // Fill portion in orange
+        batch.setColor(Color.MAROON);
+        batch.draw(player.getHealthBarTexture(), barX, barY, barW * percent, barH);
+
+        batch.setColor(Color.WHITE);
+    }
+
     private void updateCamera(float delta) {
-        float smoothing = 0.03f;
+        float smoothing = 0.1f;
         float targetX = player.getX();
         float targetY = player.getY();
-
         camera.position.x = MathUtils.lerp(camera.position.x, targetX, smoothing);
         camera.position.y = MathUtils.lerp(camera.position.y, targetY, smoothing);
 
         float halfW = camera.viewportWidth / 2f;
         float halfH = camera.viewportHeight / 2f;
-
-        camera.position.x = MathUtils.clamp(camera.position.x, halfW, mapWidth - halfW);
-        camera.position.y = MathUtils.clamp(camera.position.y, halfH, mapHeight - halfH);
+        camera.position.x = MathUtils.clamp(camera.position.x, halfW, tileMapRenderer.getMapWidth() - halfW);
+        camera.position.y = MathUtils.clamp(camera.position.y, halfH, tileMapRenderer.getMapHeight() - halfH);
 
         camera.update();
     }
@@ -160,8 +191,10 @@ public class Main extends ApplicationAdapter {
     @Override
     public void dispose() {
         batch.dispose();
+        overlayTexture.dispose();
         goblin.dispose();
-        bushOverlayTexture.dispose();
+        npc.dispose();
+        player.dispose();
         tileMapRenderer.dispose();
     }
 }

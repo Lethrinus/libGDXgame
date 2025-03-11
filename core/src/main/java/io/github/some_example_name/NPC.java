@@ -1,123 +1,179 @@
 package io.github.some_example_name;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.*;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.Input;
 
 public class NPC {
-    // NPC position
     private float x, y;
-
-    // Idle animation for the NPC
     private Animation<TextureRegion> idleAnimation;
     private float stateTime = 0f;
 
-    // Dialogue data
     private String[] dialogues;
     private int currentDialogueIndex = 0;
     private boolean inDialogue = false;
 
-    // Speech bubble texture (simple rectangle)
-    private Texture speechBubbleTexture;
+    private Texture bubbleTexture;
 
-    // Font for drawing dialogue text
+    // This font will be generated in pixels, then scaled down to world units
     private BitmapFont font;
 
-    // Dialogue bubble dimensions
-    private float bubbleWidth = 150;
-    private float bubbleHeight = 50;
+    private float bubbleWidth = 5f;
+    private float bubbleHeight = 1.5f;
 
-    // Interaction radius for starting dialogue
     private float interactionRadius = 2.0f;
 
-    /**
-     * Constructs an NPC.
-     * @param x The x position
-     * @param y The y position
-     * @param dialogues An array of dialogue strings
-     */
+    private Texture pawnTexture;
+
+    // Typing effect fields
+    private float typedTimer = 0f;
+    private float typedSpeed = 5f;
+    private int typedIndex = 0;
+    private String typedText = "";
+    private boolean typedComplete = false;
+
     public NPC(float x, float y, String[] dialogues) {
         this.x = x;
         this.y = y;
         this.dialogues = dialogues;
 
-        // Load NPC idle animation from Pawn assets using TextureAtlas
-        TextureAtlas atlas = new TextureAtlas(Gdx.files.internal("Pawn/pawn_animations.atlas"));
-        // Assuming the atlas has a region named "idle"
-        idleAnimation = new Animation<TextureRegion>(0.2f, atlas.findRegions("pawn_idle"), Animation.PlayMode.LOOP);
-        atlas.dispose();
+        // 1) Load pawn animation
+        pawnTexture = new Texture(Gdx.files.internal("Pawn/pawn_animations.png"));
+        TextureRegion idleRegion = new TextureRegion(pawnTexture, 2, 2, 1152, 186);
+        TextureRegion[][] tmp = idleRegion.split(192, 186);
+        idleAnimation = new Animation<>(0.2f, tmp[0]);
+        idleAnimation.setPlayMode(Animation.PlayMode.LOOP);
 
-        // Create a simple white texture for the speech bubble
-        Pixmap pixmap = new Pixmap((int)bubbleWidth, (int)bubbleHeight, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.WHITE);
-        pixmap.fill();
-        speechBubbleTexture = new Texture(pixmap);
-        pixmap.dispose();
+        // 2) Load dialogue bubble texture
+        bubbleTexture = new Texture(Gdx.files.internal("bubble.png"));
 
-        // Create a default BitmapFont for dialogue text
-        font = new BitmapFont();
-        font.setColor(Color.BLACK);
+        // 3) Generate a font in pixel size, then scale it down
+        // Generate the font
+        FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/Homer_Simpson_Revised.ttf"));
+        FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
+        parameter.size = 16;  // smaller glyph size
+        parameter.color = Color.BLACK;
+        font = generator.generateFont(parameter);
+        generator.dispose();
+
+// Scale down in the 16×9 world
+        font.getData().setScale(1/16f);  // about 0.0625
+
+// Remove or comment out the extra line spacing for now
+        font.getData().down *= 0.15f; // optional, fine-tune later
+
+                // ... later in startTypingEffect:
+        typedSpeed = 9999f;  // to test if your text is sized & wrapped correctly
+
+
+        // 4) Start typing effect with the first dialogue
+        startTypingEffect(dialogues[0]);
     }
 
-    /**
-     * Updates the NPC state.
-     * @param delta Time delta
-     * @param playerPos The player's position for interaction check
-     */
     public void update(float delta, Vector2 playerPos) {
         stateTime += delta;
-        // If the player is within interaction radius and presses the E key, progress dialogue
-        if (playerPos.dst(x, y) <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            inDialogue = true;
-            currentDialogueIndex++;
-            if (currentDialogueIndex >= dialogues.length) {
-                // Dialogue finished; reset or close dialogue as desired
-                currentDialogueIndex = 0;
-                inDialogue = false;
+        float dist = playerPos.dst(x, y);
+
+        // If player is close enough and presses E, handle dialogue
+        if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            if (!inDialogue) {
+                // Start dialogue
+                inDialogue = true;
+                currentDialogueIndex++;
+                if (currentDialogueIndex >= dialogues.length) {
+                    currentDialogueIndex = 0;
+                }
+                startTypingEffect(dialogues[currentDialogueIndex]);
+            } else {
+                // Already in dialogue
+                if (!typedComplete) {
+                    // If text not fully typed yet, jump to the end
+                    typedIndex = typedText.length();
+                    typedComplete = true;
+                } else {
+                    // Go to next dialogue
+                    currentDialogueIndex++;
+                    if (currentDialogueIndex >= dialogues.length) {
+                        currentDialogueIndex = 0;
+                        inDialogue = false;
+                    } else {
+                        startTypingEffect(dialogues[currentDialogueIndex]);
+                    }
+                }
             }
         }
-    }
 
-    /**
-     * Renders the NPC and, if active, the dialogue speech bubble.
-     * @param batch The SpriteBatch used for rendering
-     */
-    public void render(SpriteBatch batch) {
-        // Render NPC idle animation
-        TextureRegion currentFrame = idleAnimation.getKeyFrame(stateTime, true);
-        float drawX = x - currentFrame.getRegionWidth() / 2f;
-        float drawY = y - currentFrame.getRegionHeight() / 2f;
-        batch.draw(currentFrame, drawX, drawY);
+        // If in dialogue but text is empty, start it again
+        if (inDialogue && (typedText == null || typedText.isEmpty())) {
+            startTypingEffect(dialogues[currentDialogueIndex]);
+        }
 
-        // If dialogue is active, render the speech bubble and current dialogue text
-        if (inDialogue) {
-            float bubbleX = x - bubbleWidth / 2f;
-            float bubbleY = y + currentFrame.getRegionHeight() / 2f + 10; // slightly above the NPC
-            batch.draw(speechBubbleTexture, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
-
-            // Draw dialogue text inside the speech bubble (offset for padding)
-            String dialogueText = dialogues[currentDialogueIndex];
-            float textX = bubbleX + 10;
-            float textY = bubbleY + bubbleHeight - 10;
-            font.draw(batch, dialogueText, textX, textY);
+        // Typewriter effect
+        if (inDialogue && !typedComplete) {
+            typedTimer += delta;
+            int charsToShow = (int)(typedTimer * typedSpeed);
+            if (charsToShow >= typedText.length()) {
+                charsToShow = typedText.length();
+                typedComplete = true;
+            }
+            typedIndex = charsToShow;
         }
     }
 
-    /**
-     * Disposes of NPC resources.
-     */
+    private void startTypingEffect(String text) {
+        typedTimer = 0f;
+        typedSpeed = 999999f; // Very large => instantly display the entire text
+        typedIndex = 0;
+        typedComplete = false;
+        typedText = text;
+    }
+
+    public void render(SpriteBatch batch) {
+        // Draw NPC idle animation
+        TextureRegion currentFrame = idleAnimation.getKeyFrame(stateTime, true);
+        float spriteW = currentFrame.getRegionWidth() * (1f / 64f);
+        float spriteH = currentFrame.getRegionHeight() * (1f / 64f);
+        float drawX = x - spriteW / 2f;
+        float drawY = y - spriteH / 2f;
+        batch.draw(currentFrame, drawX, drawY, spriteW, spriteH);
+
+        // If in dialogue, draw the bubble + text
+        if (inDialogue) {
+            float bubbleX = x - bubbleWidth / 2f;
+            float bubbleY = y + spriteH / 2f - 1f;
+            batch.draw(bubbleTexture, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
+
+            // Get the portion of text to display
+            String visibleText = typedText.substring(0, Math.min(typedIndex, typedText.length()));
+
+            // Lay out the text with wrapping at (bubbleWidth - some padding)
+            // The font is scaled, so "bubbleWidth" is the correct width in world units
+            float textWrapWidth = bubbleWidth - 0.3f;
+            GlyphLayout layout = new GlyphLayout(
+                font,
+                visibleText,
+                Color.BLACK,
+                textWrapWidth,
+                Align.center,
+                false
+            );
+
+            // Position the text near the top inside the bubble
+            float textX = bubbleX + 0.2f;
+            float textY = bubbleY + bubbleHeight - 0.2f;
+            font.draw(batch, layout, textX, textY);
+        }
+    }
+
     public void dispose() {
-        speechBubbleTexture.dispose();
+        bubbleTexture.dispose();
         font.dispose();
+        pawnTexture.dispose();
     }
 
     public float getX() { return x; }

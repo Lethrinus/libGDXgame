@@ -4,7 +4,11 @@ Pawn/pawn_animations.atlas
 Pawn/pawn_animations.png
 Player/knight_atlas.atlas
 Player/knight_atlas.png
+bubble.png
 cursor.png
+deadanimation.atlas
+deadanimation.png
+fonts/Homer_Simpson_Revised.ttf
 libgdx.png
 maps/Tilesets/Bridge.tsx
 maps/Tilesets/Bush.tsx

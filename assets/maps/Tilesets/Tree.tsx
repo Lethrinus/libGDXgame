@@ -366,36 +366,24 @@
    </object>
   </objectgroup>
  </tile>
+ <tile id="386">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="25.625" y="31.8633" width="6.375" height="0.136719">
+    <properties>
+     <property name="blocked" type="bool" value="true"/>
+    </properties>
+   </object>
+  </objectgroup>
+ </tile>
  <tile id="387">
   <objectgroup draworder="index" id="2">
    <object id="3" x="8.36364" y="22" width="0.181818">
     <ellipse/>
    </object>
-   <object id="10" x="0.363636" y="18" width="10.5455" height="14">
+   <object id="4" x="0.0625" y="31.6957" width="6.375" height="0.304348">
     <properties>
      <property name="blocked" type="bool" value="true"/>
     </properties>
-    <polygon points="0,0 6.18182,5.45455 10.5455,14 0,14"/>
-   </object>
-  </objectgroup>
- </tile>
- <tile id="410">
-  <objectgroup draworder="index" id="2">
-   <object id="1" x="20" y="0.181818" width="11.8182" height="11.6364">
-    <properties>
-     <property name="blocked" type="bool" value="true"/>
-    </properties>
-    <polygon points="2.18182,0.181818 17.2727,0.363636 17.2727,12 5.09091,8.36364"/>
-   </object>
-  </objectgroup>
- </tile>
- <tile id="411">
-  <objectgroup draworder="index" id="2">
-   <object id="1" x="0.181818" y="0" width="11.8182" height="11.6364">
-    <properties>
-     <property name="blocked" type="bool" value="true"/>
-    </properties>
-    <polygon points="-4.90909,-1.11022e-16 11.8182,0 8.36364,7.45455 -4.18182,10.9091"/>
    </object>
   </objectgroup>
  </tile>

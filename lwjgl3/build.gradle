@@ -8,6 +8,7 @@ buildscript {
     if(enableGraalNative == 'true') {
       classpath "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.28"
     }
+
   }
 }
 plugins {
@@ -32,6 +33,8 @@ dependencies {
   implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
   implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
   implementation project(':core')
+  api "com.badlogicgames.gdx:gdx-platform:1.12.0:natives-desktop"
+  api "com.badlogicgames.gdx:gdx-freetype-platform:1.12.0:natives-desktop"
 
   if(enableGraalNative == 'true') {
     implementation "io.github.berstanio:gdx-svmhelper-backend-lwjgl3:$graalHelperVersion"

@@ -15,6 +15,12 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
 
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Player class with movement, attacking, dash mechanics, and collision check.
+ */
 public class Player {
     private float x, y;
     private float speed = 3.5f;
@@ -44,7 +50,7 @@ public class Player {
 
     private boolean isAttacking = false;
 
-    // Dashing fields
+    // Dash fields
     private boolean isDashing = false;
     private float dashTimeLeft = 0f;
     private float dashSpeed = 10f;
@@ -63,7 +69,7 @@ public class Player {
         float alpha;
         float timeToLive;
     }
-    private java.util.List<GhostFrame> ghosts = new java.util.ArrayList<>();
+    private List<GhostFrame> ghosts = new ArrayList<>();
 
     // Atlas parameters
     private int frameWidth, frameHeight;
@@ -128,8 +134,8 @@ public class Player {
         currentMovementAnim = idleAnimation;
 
         // Starting position
-        x = 16;
-        y = 9;
+        x = 8;
+        y = 4.5f;
 
         // Create a simple white texture for the health bar
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
@@ -204,15 +210,34 @@ public class Player {
     }
 
     public void update(float delta) {
-        // Handle dash cooldown and duration
+        // Handle dash cooldown
         if (dashCooldownTimer > 0f) {
             dashCooldownTimer -= delta;
             if (dashCooldownTimer < 0f) dashCooldownTimer = 0f;
         }
-        if (!isDashing && dashCooldownTimer <= 0f && Gdx.input.isKeyJustPressed(Input.Keys.F)) {
-            isDashing = true;
-            dashTimeLeft = dashDuration;
+
+        // Process movement input
+        float dx = 0, dy = 0;
+        if (Gdx.input.isKeyPressed(Input.Keys.W)) dy += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.S)) dy -= 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.D)) dx += 1;
+        if (Gdx.input.isKeyPressed(Input.Keys.A)) dx -= 1;
+
+        // Normalize diagonal movement
+        if (dx != 0 && dy != 0) {
+            dx *= 0.7071f;
+            dy *= 0.7071f;
         }
+
+        // Handle dash input (only if moving)
+        if (!isDashing && dashCooldownTimer <= 0f && Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+            if (dx != 0 || dy != 0) {
+                isDashing = true;
+                dashTimeLeft = dashDuration;
+            }
+        }
+
+        // If dashing, decrement time and spawn ghost images
         if (isDashing) {
             dashTimeLeft -= delta;
             if (dashTimeLeft <= 0f) {
@@ -223,7 +248,7 @@ public class Player {
             }
         }
 
-        // Handle attack input and processing
+        // Handle attack input
         if (!isAttacking && Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             isAttacking = true;
             attackStateTime = 0f;
@@ -244,15 +269,17 @@ public class Player {
                 facingRight = false;
             }
         }
+
+        // Attack logic
         if (isAttacking) {
             attackStateTime += delta;
             if (!attackExecuted && attackStateTime >= attackHitTime) {
                 if (targetGoblin != null) {
-                    float dx = targetGoblin.getX() - x;
-                    float dy = targetGoblin.getY() - y;
-                    float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                    float dxg = targetGoblin.getX() - x;
+                    float dyg = targetGoblin.getY() - y;
+                    float dist = (float) Math.sqrt(dxg * dxg + dyg * dyg);
                     if (dist <= attackRange) {
-                        float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+                        float angle = MathUtils.atan2(dyg, dxg) * MathUtils.radiansToDegrees;
                         targetGoblin.takeDamage(attackDamage, attackKnockbackForce, angle);
                         attackExecuted = true;
                     }
@@ -261,45 +288,38 @@ public class Player {
             if (attackStateTime >= attackDuration) {
                 isAttacking = false;
             }
-            return;
-        }
-
-        // Process movement input
-        float dx = 0, dy = 0;
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) dy += 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) dy -= 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) dx += 1;
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) dx -= 1;
-        if (dx != 0 && dy != 0) {
-            dx *= 0.7071f;
-            dy *= 0.7071f;
-        }
-        float oldX = x, oldY = y;
-        float moveSpeed = isDashing ? dashSpeed : speed;
-        x += dx * moveSpeed * delta;
-        y += dy * moveSpeed * delta;
-
-        // Simple collision check
-        Rectangle playerRect = new Rectangle(x - COLLISION_W / 2f, y - COLLISION_H / 2f, COLLISION_W, COLLISION_H);
-        if (tileMapRenderer.isCellBlocked((int)Math.floor(x), (int)Math.floor(y), createRectanglePolygon(playerRect))) {
-            x = oldX;
-            y = oldY;
-        }
-
-        // Update movement animation based on input
-        if (dx != 0 || dy != 0) {
-            if (dx < 0) {
-                currentMovementAnim = runningLeft;
-                facingRight = false;
-            } else {
-                currentMovementAnim = runningRight;
-                facingRight = true;
-            }
         } else {
-            currentMovementAnim = facingRight ? idleAnimation : idleAnimationLeft;
+            // Store old position
+            float oldX = x, oldY = y;
+            float moveSpeed = isDashing ? dashSpeed : speed;
+            x += dx * moveSpeed * delta;
+            y += dy * moveSpeed * delta;
+
+            // Collision check: create rectangle and convert to polygon
+            Rectangle playerRect = new Rectangle(x - COLLISION_W / 2f, y - COLLISION_H / 2f, COLLISION_W, COLLISION_H);
+            Polygon poly = createRectanglePolygon(playerRect);
+            if (tileMapRenderer.isCellBlocked((int) Math.floor(x), (int) Math.floor(y), poly)) {
+                x = oldX;
+                y = oldY;
+            }
+
+            // Update movement animation based on input
+            if (dx != 0 || dy != 0) {
+                if (dx < 0) {
+                    currentMovementAnim = runningLeft;
+                    facingRight = false;
+                } else if (dx > 0) {
+                    currentMovementAnim = runningRight;
+                    facingRight = true;
+                } else {
+                    currentMovementAnim = facingRight ? runningRight : runningLeft;
+                }
+            } else {
+                currentMovementAnim = facingRight ? idleAnimation : idleAnimationLeft;
+            }
         }
 
-        // Apply knockback effect
+        // Apply knockback
         if (knockback.len() > 0.01f) {
             x += knockback.x * delta;
             y += knockback.y * delta;
@@ -309,7 +329,6 @@ public class Player {
             }
         }
         movementStateTime += delta;
-
         if (redFlashTimer > 0) redFlashTimer -= delta;
         updateGhosts(delta);
     }
@@ -326,14 +345,13 @@ public class Player {
     }
 
     private void updateGhosts(float delta) {
-        java.util.Iterator<GhostFrame> it = ghosts.iterator();
         float fadeRate = GHOST_INITIAL_ALPHA / GHOST_INITIAL_TIME;
-        while (it.hasNext()) {
-            GhostFrame g = it.next();
+        for (int i = ghosts.size() - 1; i >= 0; i--) {
+            GhostFrame g = ghosts.get(i);
             g.timeToLive -= delta;
             g.alpha -= fadeRate * delta;
             if (g.timeToLive <= 0f || g.alpha <= 0f) {
-                it.remove();
+                ghosts.remove(i);
             }
         }
     }
@@ -361,7 +379,7 @@ public class Player {
         float drawW = frame.getRegionWidth() * scale;
         float drawH = frame.getRegionHeight() * scale;
 
-        // Render ghost trail behind the player
+        // Render ghost trail
         for (GhostFrame ghost : ghosts) {
             float w = ghost.region.getRegionWidth() * scale;
             float h = ghost.region.getRegionHeight() * scale;
@@ -369,9 +387,11 @@ public class Player {
             batch.draw(ghost.region, ghost.x - w / 2f, ghost.y - h / 2f, w, h);
         }
         batch.setColor(1, 1, 1, 1);
+
+        // Render player sprite
         batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
 
-        // Draw red flash overlay when hit
+        // Render red flash overlay if applicable
         if (redFlashTimer > 0) {
             batch.setColor(1, 0, 0, 0.3f);
             batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
@@ -380,15 +400,19 @@ public class Player {
     }
 
     /**
-     * Renders the player's health bar.
+     * Renders the player's health bar above the player.
      */
     public void renderHealthBar(SpriteBatch batch) {
         float barWidth = 1f;
         float barHeight = 0.1f;
         float healthPercentage = health / maxHealth;
         batch.setColor(1, 0, 0, 1);
-        batch.draw(healthBarTexture, x - barWidth / 2, y + (barWidth / 2f) + 0.2f, barWidth * healthPercentage, barHeight);
+        batch.draw(healthBarTexture, x - barWidth / 2, y + 0.7f, barWidth * healthPercentage, barHeight);
         batch.setColor(1, 1, 1, 1);
+    }
+
+    public Texture getHealthBarTexture() {
+        return healthBarTexture;
     }
 
     /**
@@ -397,5 +421,13 @@ public class Player {
     public void dispose() {
         atlas.dispose();
         healthBarTexture.dispose();
+    }
+
+    // Getter methods for dash UI
+    public float getDashCooldown() {
+        return dashCooldown;
+    }
+    public float getDashCooldownTimer() {
+        return dashCooldownTimer;
     }
 }
