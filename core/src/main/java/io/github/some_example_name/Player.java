@@ -3,8 +3,6 @@ package io.github.some_example_name;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -14,18 +12,17 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Player class with movement, attacking, dash mechanics, and collision check.
+ * Player class with movement, attacking, dash mechanics, and collision detection.
  */
 public class Player {
     private float x, y;
     private float speed = 3.5f;
 
-    // Timers for movement and attack animations
+    // Timers for movement and attack animations.
     private float movementStateTime = 0f;
     private float attackStateTime = 0f;
 
@@ -33,24 +30,24 @@ public class Player {
     private TileMapRenderer tileMapRenderer;
     private Texture atlas;
 
-    // Movement animations
-    private Animation<TextureRegion> idleAnimation;
-    private Animation<TextureRegion> idleAnimationLeft;
-    private Animation<TextureRegion> runningRight;
-    private Animation<TextureRegion> runningLeft;
-    // Attack animations
-    private Animation<TextureRegion> attackTop;
-    private Animation<TextureRegion> attackBottom;
-    private Animation<TextureRegion> attackRight;
-    private Animation<TextureRegion> attackLeft;
+    // Movement animations.
+    private Animation<TextureRegion> idleAnimation, idleAnimationLeft, runningRight, runningLeft;
+    // Attack animations.
+    private Animation<TextureRegion> attackTop, attackBottom, attackRight, attackLeft;
 
-    // Currently active animations
+    private Animation<TextureRegion> healAnimation;
+    private Texture healTexture;
+    private float healStateTime = 0f;
+    private boolean isHealing = false;
+    private float healScale = 1f / 64f; // Scale factor for heal effect.
+
+    // Currently active animations.
     private Animation<TextureRegion> currentMovementAnim;
     private Animation<TextureRegion> currentAttackAnim;
 
     private boolean isAttacking = false;
 
-    // Dash fields
+    // Dash fields.
     private boolean isDashing = false;
     private float dashTimeLeft = 0f;
     private float dashSpeed = 10f;
@@ -58,11 +55,11 @@ public class Player {
     private float dashCooldown = 1.0f;
     private float dashCooldownTimer = 0f;
 
-    // Ghost trail constants
+    // Ghost trail constants.
     private static final float GHOST_INITIAL_ALPHA = 0.4f;
     private static final float GHOST_INITIAL_TIME = 0.15f;
 
-    // Ghost trail container
+    // Ghost trail container.
     private static class GhostFrame {
         float x, y;
         TextureRegion region;
@@ -71,31 +68,29 @@ public class Player {
     }
     private List<GhostFrame> ghosts = new ArrayList<>();
 
-    // Atlas parameters
+    // Atlas parameters.
     private int frameWidth, frameHeight;
     private float scale = 1.0f / 72f;
     private static final int NUM_FRAMES = 6;
 
-    // Collision box dimensions
+    // Collision box dimensions.
     private static final float COLLISION_W = 0.6f;
     private static final float COLLISION_H = 0.6f;
 
-    // Direction (true = facing right)
+    // Direction (true = facing right).
     private boolean facingRight = true;
 
-    // Health, knockback and red flash effect
-    private float maxHealth = 100f;
-    private float health = maxHealth;
-    private Texture healthBarTexture;
-
+    // Health, knockback, and red flash effect.
+    private float maxHealth;
+    private float health;
     private float redFlashDuration = 0.2f;
     private float redFlashTimer = 0f;
 
-    // Knockback vector
+    // Knockback vector.
     private Vector2 knockback = new Vector2(0, 0);
     private float knockbackDecay = 5f;
 
-    // Attack-related fields
+    // Attack-related fields.
     private Goblin targetGoblin;
     private boolean attackExecuted = false;
     private float attackHitTime = 0.15f;
@@ -106,6 +101,8 @@ public class Player {
 
     public float getX() { return x; }
     public float getY() { return y; }
+    public float getHealth() { return health; }
+    public float getMaxHealth() { return maxHealth; }
 
     private Inventory inventory;
 
@@ -117,14 +114,29 @@ public class Player {
         this.inventory = new Inventory();
         atlas = new Texture(Gdx.files.internal("Player/knight_atlas.png"));
 
-        // Define subregions for animations
+        // Initialize heal animation.
+        healTexture = new Texture(Gdx.files.internal("Player/heal_animation.png"));
+        TextureRegion healRegion = new TextureRegion(healTexture, 2, 2, 512, 512);
+        int rows = 4, cols = 4;
+        TextureRegion[][] healFrames2D = healRegion.split(512 / cols, 512 / rows);
+        TextureRegion[] healFrames = new TextureRegion[rows * cols];
+        int index = 0;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                healFrames[index++] = healFrames2D[i][j];
+            }
+        }
+        healAnimation = new Animation<TextureRegion>(0.1f, healFrames);
+        healAnimation.setPlayMode(Animation.PlayMode.NORMAL);
+
+        // Define subregions for animations.
         TextureRegion idleRegion         = new TextureRegion(atlas, 2, 2, 1152, 195);
         TextureRegion attackTopRegion    = new TextureRegion(atlas, 2, 199, 1152, 195);
         TextureRegion attackBottomRegion = new TextureRegion(atlas, 2, 396, 1152, 195);
         TextureRegion attackRightRegion  = new TextureRegion(atlas, 2, 593, 1152, 195);
         TextureRegion runRightRegion     = new TextureRegion(atlas, 2, 790, 1152, 195);
 
-        frameWidth  = 1152 / NUM_FRAMES; // 192
+        frameWidth  = 1152 / NUM_FRAMES; // 192 pixels per frame.
         frameHeight = 195;
 
         idleAnimation     = buildAnimation(idleRegion, 0.25f, Animation.PlayMode.LOOP);
@@ -138,16 +150,17 @@ public class Player {
 
         currentMovementAnim = idleAnimation;
 
-        // Starting position
+        // Set starting position.
         x = 8;
         y = 4.5f;
+    }
 
-        // Create a simple white texture for the health bar
-        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.WHITE);
-        pixmap.fill();
-        healthBarTexture = new Texture(pixmap);
-        pixmap.dispose();
+    /**
+     * Triggers the healing effect animation.
+     */
+    public void triggerHealEffect() {
+        isHealing = true;
+        healStateTime = 0f;
     }
 
     private Animation<TextureRegion> buildAnimation(TextureRegion region, float frameDuration, Animation.PlayMode mode) {
@@ -177,18 +190,16 @@ public class Player {
             health = maxHealth;
         }
     }
-    public float getHealth() {
-        return health;
-    }
-    public float getMaxHealth() {
-        return maxHealth;
-    }
+
     public Inventory getInventory() {
         return inventory;
     }
 
     /**
      * Sets the player's position.
+     *
+     * @param x New x-coordinate.
+     * @param y New y-coordinate.
      */
     public void setPosition(float x, float y) {
         this.x = x;
@@ -197,6 +208,8 @@ public class Player {
 
     /**
      * Sets the target goblin for attack interactions.
+     *
+     * @param goblin The target Goblin.
      */
     public void setTargetGoblin(Goblin goblin) {
         this.targetGoblin = goblin;
@@ -204,6 +217,8 @@ public class Player {
 
     /**
      * Updates the TileMapRenderer reference (used when changing maps).
+     *
+     * @param tileMapRenderer The new TileMapRenderer.
      */
     public void setTileMapRenderer(TileMapRenderer tileMapRenderer) {
         this.tileMapRenderer = tileMapRenderer;
@@ -211,6 +226,8 @@ public class Player {
 
     /**
      * Checks if the player is currently in a bush cell.
+     *
+     * @return true if in a bush cell; false otherwise.
      */
     public boolean isInBush() {
         int tileX = (int) Math.floor(x);
@@ -220,6 +237,10 @@ public class Player {
 
     /**
      * Applies damage, knockback, and red flash effect to the player.
+     *
+     * @param damage         Damage amount.
+     * @param knockbackForce Force of the knockback.
+     * @param angleDegrees   Direction of the knockback in degrees.
      */
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
@@ -229,28 +250,37 @@ public class Player {
             knockbackForce * MathUtils.sin(angleRad) * 1.5f);
         redFlashTimer = redFlashDuration;
     }
-
+    public float getSpriteHeight() {
+        // Use the current movement animation frame.
+        TextureRegion currentFrame = currentMovementAnim.getKeyFrame(movementStateTime);
+        return currentFrame.getRegionHeight() * scale;
+    }
     public void update(float delta) {
-        // Handle dash cooldown
+        // Handle dash cooldown.
         if (dashCooldownTimer > 0f) {
             dashCooldownTimer -= delta;
             if (dashCooldownTimer < 0f) dashCooldownTimer = 0f;
         }
-
-        // Process movement input
+        if (isHealing) {
+            healStateTime += delta;
+            if (healAnimation.isAnimationFinished(healStateTime)) {
+                isHealing = false;
+            }
+        }
+        // Process movement input.
         float dx = 0, dy = 0;
         if (Gdx.input.isKeyPressed(Input.Keys.W)) dy += 1;
         if (Gdx.input.isKeyPressed(Input.Keys.S)) dy -= 1;
         if (Gdx.input.isKeyPressed(Input.Keys.D)) dx += 1;
         if (Gdx.input.isKeyPressed(Input.Keys.A)) dx -= 1;
 
-        // Normalize diagonal movement
+        // Normalize diagonal movement.
         if (dx != 0 && dy != 0) {
             dx *= 0.7071f;
             dy *= 0.7071f;
         }
 
-        // Handle dash input (only if moving)
+        // Handle dash input (only if moving).
         if (!isDashing && dashCooldownTimer <= 0f && Gdx.input.isKeyJustPressed(Input.Keys.F)) {
             if (dx != 0 || dy != 0) {
                 isDashing = true;
@@ -258,7 +288,7 @@ public class Player {
             }
         }
 
-        // If dashing, decrement time and spawn ghost images
+        // If dashing, decrement time and spawn ghost images.
         if (isDashing) {
             dashTimeLeft -= delta;
             if (dashTimeLeft <= 0f) {
@@ -269,7 +299,7 @@ public class Player {
             }
         }
 
-        // Handle attack input
+        // Handle attack input.
         if (!isAttacking && Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             isAttacking = true;
             attackStateTime = 0f;
@@ -291,7 +321,7 @@ public class Player {
             }
         }
 
-        // Attack logic
+        // Attack logic.
         if (isAttacking) {
             attackStateTime += delta;
             if (!attackExecuted && attackStateTime >= attackHitTime) {
@@ -310,13 +340,13 @@ public class Player {
                 isAttacking = false;
             }
         } else {
-            // Store old position
+            // Store old position.
             float oldX = x, oldY = y;
             float moveSpeed = isDashing ? dashSpeed : speed;
             x += dx * moveSpeed * delta;
             y += dy * moveSpeed * delta;
 
-            // Collision check: create rectangle and convert to polygon
+            // Collision check: create rectangle and convert to polygon.
             Rectangle playerRect = new Rectangle(x - COLLISION_W / 2f, y - COLLISION_H / 2f, COLLISION_W, COLLISION_H);
             Polygon poly = createRectanglePolygon(playerRect);
             if (tileMapRenderer.isCellBlocked((int) Math.floor(x), (int) Math.floor(y), poly)) {
@@ -324,15 +354,20 @@ public class Player {
                 y = oldY;
             }
 
-            // Update movement animation based on input
+            // Update movement animation based on input.
             if (dx != 0 || dy != 0) {
-                if (dx < 0) {
-                    currentMovementAnim = runningLeft;
-                    facingRight = false;
-                } else if (dx > 0) {
-                    currentMovementAnim = runningRight;
-                    facingRight = true;
+                if (dx != 0) {
+                    if (dx < 0) {
+                        currentMovementAnim = runningLeft;
+                        facingRight = false;
+                    } else {
+                        currentMovementAnim = runningRight;
+                        facingRight = true;
+                    }
                 } else {
+                    // Only vertical movement.
+                    // If vertical running animations are available, use them.
+                    // Otherwise, use the horizontal running animation as a fallback.
                     currentMovementAnim = facingRight ? runningRight : runningLeft;
                 }
             } else {
@@ -340,7 +375,7 @@ public class Player {
             }
         }
 
-        // Apply knockback
+        // Apply knockback.
         if (knockback.len() > 0.01f) {
             x += knockback.x * delta;
             y += knockback.y * delta;
@@ -388,19 +423,18 @@ public class Player {
     }
 
     /**
-     * Renders the player and ghost trail.
+     * Renders the player and its ghost trail.
+     *
+     * @param batch The SpriteBatch used for rendering.
      */
     public void render(SpriteBatch batch) {
-        TextureRegion frame;
-        if (isAttacking) {
-            frame = currentAttackAnim.getKeyFrame(attackStateTime);
-        } else {
-            frame = currentMovementAnim.getKeyFrame(movementStateTime);
-        }
+        // Determine current frame based on whether attacking or moving.
+        TextureRegion frame = isAttacking ? currentAttackAnim.getKeyFrame(attackStateTime)
+            : currentMovementAnim.getKeyFrame(movementStateTime);
         float drawW = frame.getRegionWidth() * scale;
         float drawH = frame.getRegionHeight() * scale;
 
-        // Render ghost trail
+        // Render ghost trail.
         for (GhostFrame ghost : ghosts) {
             float w = ghost.region.getRegionWidth() * scale;
             float h = ghost.region.getRegionHeight() * scale;
@@ -409,10 +443,18 @@ public class Player {
         }
         batch.setColor(1, 1, 1, 1);
 
-        // Render player sprite
+        // Render the player sprite.
         batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
 
-        // Render red flash overlay if applicable
+        // Render heal effect centered on the player.
+        if (isHealing) {
+            TextureRegion healFrame = healAnimation.getKeyFrame(healStateTime);
+            float healW = healFrame.getRegionWidth() * healScale;
+            float healH = healFrame.getRegionHeight() * healScale;
+            batch.draw(healFrame, x - healW / 2f, y - healH / 2f, healW, healH);
+        }
+
+        // Render red flash effect if damaged.
         if (redFlashTimer > 0) {
             batch.setColor(1, 0, 0, 0.3f);
             batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
@@ -420,36 +462,19 @@ public class Player {
         }
     }
 
-    /**
-     * Renders the player's health bar above the player.
-     */
-    public void renderHealthBar(SpriteBatch batch) {
-        float barWidth = 1f;
-        float barHeight = 0.1f;
-        float healthPercentage = health / maxHealth;
-        batch.setColor(1, 0, 0, 1);
-        batch.draw(healthBarTexture, x - barWidth / 2, y + 0.7f, barWidth * healthPercentage, barHeight);
-        batch.setColor(1, 1, 1, 1);
+    // Getter methods for dash cooldown UI.
+    public float getDashCooldown() {
+        return dashCooldown;
     }
-
-    public Texture getHealthBarTexture() {
-        return healthBarTexture;
+    public float getDashCooldownTimer() {
+        return dashCooldownTimer;
     }
-
 
     /**
      * Disposes of player resources.
      */
     public void dispose() {
         atlas.dispose();
-        healthBarTexture.dispose();
-    }
-
-    // Getter methods for dash UI
-    public float getDashCooldown() {
-        return dashCooldown;
-    }
-    public float getDashCooldownTimer() {
-        return dashCooldownTimer;
+        healTexture.dispose();
     }
 }

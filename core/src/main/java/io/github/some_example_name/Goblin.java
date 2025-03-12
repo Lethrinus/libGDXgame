@@ -2,9 +2,6 @@ package io.github.some_example_name;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -13,7 +10,7 @@ import com.badlogic.gdx.math.Vector2;
 
 /**
  * A basic Goblin enemy with patrol, chase, and attack states.
- * Death animation finishes, then after 5s disappears.
+ * After the death animation finishes, the goblin disappears after a delay.
  */
 public class Goblin {
     private enum State { IDLE, PATROL, CHASE, ATTACK }
@@ -22,22 +19,16 @@ public class Goblin {
     private float x, y;
     private float speed = 2.0f;
 
-    // Patrol boundaries
-    private float patrolMinX, patrolMaxX, patrolMinY, patrolMaxY;
-    private float patrolTargetX, patrolTargetY;
+    // Patrol boundaries.
+    private float patrolMinX, patrolMaxX, patrolMinY, patrolMaxY, patrolTargetX, patrolTargetY;
 
-    // Distance thresholds
+    // Distance thresholds.
     private float alertRadius = 4.0f;
     private float attackRadius = 1.0f;
 
-    // Animations
+    // Animations.
     private Texture atlas;
-    private Animation<TextureRegion> idleAnimation;
-    private Animation<TextureRegion> runRight, runLeft;
-    private Animation<TextureRegion> attackRight, attackLeft;
-    private Animation<TextureRegion> attackUp, attackDown;
-    private Animation<TextureRegion> currentMovementAnim;
-    private Animation<TextureRegion> currentAttackAnim;
+    private Animation<TextureRegion> idleAnimation, runRight, runLeft, attackRight, attackLeft, attackUp, attackDown, currentMovementAnim, currentAttackAnim;
 
     private float movementStateTime = 0f;
     private float attackStateTime = 0f;
@@ -46,12 +37,10 @@ public class Goblin {
     private float scale = 1f / 72f;
 
     private Player player;
-    private OrthographicCamera camera;
 
-    // Health and knockback
+    // Health and knockback.
     private float maxHealth = 50f;
     private float health = maxHealth;
-    private Texture healthBarTexture;
 
     private Vector2 knockback = new Vector2(0, 0);
     private float knockbackDecay = 5f;
@@ -62,30 +51,32 @@ public class Goblin {
     private float attackDamage = 10f;
     private float attackKnockbackForce = 3f;
 
-    // Red flash effect
+    // Red flash effect.
     private float redFlashDuration = 0.2f;
     private float redFlashTimer = 0f;
 
-    // Death animation
+    // Death animation.
     private Animation<TextureRegion> deathAnimation;
     private float deathStateTime = 0f;
     private boolean isDying = false;
     private boolean isDead = false;
     private Texture deathTexture;
 
-    // Time after death animation finishes
+    // Time after death animation finishes.
     private float deathWaitTime = 0f;
-    private float deathDisappearDelay = 5f; // 5 seconds
+    private float deathDisappearDelay = 5f; // seconds.
 
     public float getX() { return x; }
     public float getY() { return y; }
-    public boolean isDead() { return isDead; }
-
-    public Goblin(OrthographicCamera camera, Player player,
+    public float getHealth() { return health; }
+    public float getMaxHealth() { return maxHealth; }
+    public boolean isDead() {
+        return isDead;
+    }
+    public Goblin(Player player,
                   float startX, float startY,
                   float patrolMinX, float patrolMaxX,
                   float patrolMinY, float patrolMaxY) {
-        this.camera = camera;
         this.player = player;
         this.x = startX;
         this.y = startY;
@@ -96,17 +87,17 @@ public class Goblin {
 
         atlas = new Texture(Gdx.files.internal("Goblin/goblin_animations.png"));
 
-        // Build running animation
+        // Build running animation.
         TextureRegion runRow = new TextureRegion(atlas, 2, 2, 1152, 190);
         runRight = buildAnimation(runRow, 6, 0.1f, Animation.PlayMode.LOOP);
         runLeft = mirrorAnimation(runRight);
 
-        // Build idle animation
+        // Build idle animation.
         TextureRegion idleRow = new TextureRegion(atlas, 2, 194, 1344, 190);
         idleAnimation = buildAnimation(idleRow, 7, 0.3f, Animation.PlayMode.LOOP);
         currentMovementAnim = idleAnimation;
 
-        // Build attack animations
+        // Build attack animations.
         TextureRegion attackBRow = new TextureRegion(atlas, 2, 386, 1152, 190);
         attackDown = buildAnimation(attackBRow, 6, 0.1f, Animation.PlayMode.NORMAL);
         TextureRegion attackRRow = new TextureRegion(atlas, 2, 578, 1152, 190);
@@ -115,17 +106,10 @@ public class Goblin {
         TextureRegion attackURow = new TextureRegion(atlas, 2, 770, 1152, 190);
         attackUp = buildAnimation(attackURow, 6, 0.1f, Animation.PlayMode.NORMAL);
 
-        // Build death animation
+        // Build death animation.
         deathTexture = new Texture(Gdx.files.internal("deadanimation.png"));
         TextureRegion dead1 = new TextureRegion(deathTexture, 2, 2, 1792, 128);
         deathAnimation = buildAnimation(dead1, 14, 0.1f, Animation.PlayMode.NORMAL);
-
-        // Health bar texture
-        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.WHITE);
-        pixmap.fill();
-        healthBarTexture = new Texture(pixmap);
-        pixmap.dispose();
 
         pickRandomPatrolTarget();
     }
@@ -160,6 +144,10 @@ public class Goblin {
 
     /**
      * Applies damage, knockback, and red flash effect to the goblin.
+     *
+     * @param damage         Damage amount.
+     * @param knockbackForce Force of the knockback.
+     * @param angleDegrees   Direction of the knockback in degrees.
      */
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
@@ -173,11 +161,11 @@ public class Goblin {
     public void update(float delta) {
         if (isDead) return;
 
-        // If dying, play death animation
+        // If dying, play death animation.
         if (isDying) {
             deathStateTime += delta;
             if (deathAnimation.isAnimationFinished(deathStateTime)) {
-                // Once anim is done, wait some seconds
+                // After death animation, wait for a delay before marking as dead.
                 deathWaitTime += delta;
                 if (deathWaitTime >= deathDisappearDelay) {
                     isDead = true;
@@ -186,7 +174,8 @@ public class Goblin {
             return;
         }
 
-        // If health <= 0 and not yet dying, trigger death
+
+        // Trigger death if health is depleted.
         if (health <= 0 && !isDying) {
             isDying = true;
             deathStateTime = 0f;
@@ -194,12 +183,12 @@ public class Goblin {
         }
 
         if (isAttacking) {
-            // Attack animation
+            // Handle attack animation timing.
             attackStateTime += delta;
             if (!attackExecuted && attackStateTime >= attackHitTime) {
                 float dx = player.getX() - x;
                 float dy = player.getY() - y;
-                float dist = (float)Math.sqrt(dx*dx + dy*dy);
+                float dist = (float)Math.sqrt(dx * dx + dy * dy);
                 if (dist <= attackRadius) {
                     float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
                     player.takeDamage(attackDamage, attackKnockbackForce, angle);
@@ -213,16 +202,16 @@ public class Goblin {
             return;
         }
 
-        // Distance to player
+        // Calculate distance to player.
         float dxP = player.getX() - x;
         float dyP = player.getY() - y;
-        float distToPlayer = (float)Math.sqrt(dxP*dxP + dyP*dyP);
+        float distToPlayer = (float)Math.sqrt(dxP * dxP + dyP * dyP);
 
-        // Bush mechanic: if player is in bush, goblin doesn't chase
+        // Bush mechanic: if player is in a bush, goblin continues patrolling.
         if (player.isInBush()) {
             state = State.PATROL;
         } else if (distToPlayer < attackRadius) {
-            // Attack
+            // Initiate attack if close enough.
             isAttacking = true;
             attackStateTime = 0f;
             attackExecuted = false;
@@ -232,10 +221,10 @@ public class Goblin {
             else if (angle >= -135 && angle < -45) currentAttackAnim = attackDown;
             else currentAttackAnim = attackLeft;
         } else if (distToPlayer < alertRadius) {
-            // Chase
+            // Chase the player.
             state = State.CHASE;
         } else {
-            // Patrol
+            // Otherwise, patrol.
             state = State.PATROL;
         }
 
@@ -259,7 +248,7 @@ public class Goblin {
                 break;
         }
 
-        // Apply knockback
+        // Apply knockback.
         if (knockback.len() > 0.01f) {
             x += knockback.x * delta;
             y += knockback.y * delta;
@@ -284,6 +273,11 @@ public class Goblin {
         y += ny * moveSpeed * delta;
     }
 
+    /**
+     * Renders the goblin.
+     *
+     * @param batch The SpriteBatch used for rendering.
+     */
     public void render(SpriteBatch batch) {
         if (isDead) return;
 
@@ -306,21 +300,13 @@ public class Goblin {
         }
     }
 
-    public void renderHealthBar(SpriteBatch batch) {
-        if (isDead || isDying) return;
-        float barWidth = 1f;
-        float barHeight = 0.1f;
-        float healthPercentage = health / maxHealth;
-        batch.setColor(1, 0, 0, 1);
-        batch.draw(healthBarTexture, x - barWidth / 2, y + 0.7f, barWidth * healthPercentage, barHeight);
-        batch.setColor(1, 1, 1, 1);
-    }
-
+    /**
+     * Disposes of goblin resources.
+     */
     public void dispose() {
         if (deathTexture != null) {
             deathTexture.dispose();
         }
         atlas.dispose();
-        healthBarTexture.dispose();
     }
 }

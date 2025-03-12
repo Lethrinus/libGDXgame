@@ -1,5 +1,6 @@
 package io.github.some_example_name;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;;
@@ -22,6 +23,12 @@ public class InventoryHUD {
     private final float slotSize = 75;
     private final float spacing = 10;
 
+
+    private float[] slotScales;      // Her slot için ayrı scale değeri
+    private final float normalScale = 1f;  // Normal slot boyutu
+    private final float selectedScale = 1.15f; // Seçili slot için boyut
+    private final float scaleLerpSpeed = 3.5f;
+    private float stateTime = 0f;
     /**
      * hud camera and batch
      */
@@ -29,6 +36,11 @@ public class InventoryHUD {
         hudCamera = new OrthographicCamera();
         hudCamera.setToOrtho(false, viewportWidth, viewportHeight);
         batch = new SpriteBatch();
+
+        slotScales = new float[totalSlots];
+        for (int i = 0; i < totalSlots; i++) {
+            slotScales[i] = normalScale;
+        }
     }
 
     /**
@@ -50,39 +62,49 @@ public class InventoryHUD {
         batch.setProjectionMatrix(hudCamera.combined);
         batch.begin();
 
-        // center background
+        float delta = Gdx.graphics.getDeltaTime();
+        stateTime += delta;
+
+        // Sinüs dalgası oluştur: Değer 0.9 - 1.1 arası değişir
+        float sinWave = 1.0f + 0.1f * (float)Math.sin(stateTime * 3.0f);
+
         float bgX = (hudCamera.viewportWidth - bgWidth) / 2f;
         float bgY = 20;
         batch.draw(inventoryBg, bgX, bgY, bgWidth, bgHeight);
 
-        // draw slots
         float totalWidthAllSlots = totalSlots * slotSize + (totalSlots - 1) * spacing;
         float slotsStartX = bgX + (bgWidth - totalWidthAllSlots) / 2f;
         float slotsY = bgY + (bgHeight - slotSize) / 2f;
 
-        // list of the items in inventory
-        // example player.getInventory().getItems()
         for (int i = 0; i < totalSlots; i++) {
-            // draw the slot background
             float xPos = slotsStartX + i * (slotSize + spacing);
+
+            float targetScale = (i == selectedSlot) ? selectedScale * sinWave : normalScale;
+
+            // Lerp ile geçişli scale değeri
+            slotScales[i] += (targetScale - slotScales[i]) * delta * scaleLerpSpeed;
+
+            float currentSlotSize = slotSize * slotScales[i];
+            float xSlot = xPos + (slotSize - currentSlotSize) / 2f;
+            float ySlot = slotsY + (slotSize - currentSlotSize) / 2f;
+
             if (i == selectedSlot) {
-                batch.draw(slotSelected, xPos, slotsY, slotSize, slotSize);
+                batch.draw(slotSelected, xSlot, ySlot, currentSlotSize, currentSlotSize);
             } else {
-                batch.draw(slotNormal, xPos, slotsY, slotSize, slotSize);
+                batch.draw(slotNormal, xSlot, ySlot, currentSlotSize, currentSlotSize);
             }
 
-            // if there is item towards to this slot draw it
-            // (i < inventory.size() control)
             if (i < player.getInventory().getItems().size()) {
                 Item item = player.getInventory().getItems().get(i);
                 if (item != null && item.getIcon() != null) {
-                    // for centering the icon adding offset
-                    float iconSize = 160;
+                    float iconSize = 135;
                     if(i == selectedSlot) {
-                        iconSize += 125;
+                        iconSize += 35;
                     }
-                    float iconX = xPos + (slotSize - iconSize) / 2.2f;
-                    float iconY = slotsY + (slotSize - iconSize) /2f;
+
+                    float iconX = xSlot + (currentSlotSize - iconSize) / 2f;
+                    float iconY = ySlot + (currentSlotSize - iconSize) / 2f;
+
                     batch.draw(item.getIcon(), iconX, iconY, iconSize, iconSize);
                 }
             }
@@ -90,7 +112,6 @@ public class InventoryHUD {
 
         batch.end();
     }
-
     /**
      * slot selecting (currently just keyboard)
      */

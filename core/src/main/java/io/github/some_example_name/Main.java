@@ -3,16 +3,20 @@ package io.github.some_example_name;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import java.util.List;
 
 /**
- * Main game class with:
- *  - Gradual fade overlay when player is in a bush
- *  - Conditional tree top shader if player is under tree tile
- *  - Bigger dash bar in orange
+ * Main game class.
+ * Features:
+ *  - Gradual fade overlay when the player is in a bush.
+ *  - Conditional tree top shader if the player is under a tree tile.
+ *  - A larger dash cooldown bar in orange.
+ *  - Enhanced health bar rendering.
  */
 public class Main extends ApplicationAdapter {
     private SpriteBatch batch;
@@ -22,43 +26,63 @@ public class Main extends ApplicationAdapter {
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
     private InventoryHUD hud;
-    // Overlay for bush dim effect
+    // Overlay for bush dim effect.
     private Texture overlayTexture;
-    private float overlayAlpha = 0f;          // current alpha
-    private final float overlayTarget = 0.3f; // max alpha
-    private final float overlayFadeSpeed = 1f; // how fast it fades in/out
+    private float overlayAlpha = 0f;          // Current alpha value.
+    private final float overlayTarget = 0.3f;   // Maximum alpha value.
+    private final float overlayFadeSpeed = 1f;  // Fade speed.
+
+    // Health bar renderers for player and goblin.
+    private HealthBarRenderer healthBarRendererPlayer;
+    private HealthBarRenderer healthBarRendererGoblin;
+    // White texture used for dash cooldown bar.
+    private Texture whiteTexture;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
 
-        // Optional custom cursor
+        // Optional custom cursor.
         Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("HUD/cursor.png"));
         Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, 0, 0);
         Gdx.graphics.setCursor(customCursor);
         cursorPixmap.dispose();
-        //hud
+
+        // Initialize HUD.
         hud = new InventoryHUD();
         hud.initializeCamera(1200, 800);
         hud.loadTextures();
-        // Camera: 16x9 world units
+
+        // Set up camera: 16x9 world units.
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
         camera.update();
 
-        // Load tile map
+        // Load tile map.
         tileMapRenderer = new TileMapRenderer(camera, "maps/tileset.tmx");
 
-        // Create player at center
+        // Create player at center.
         player = new Player(camera, tileMapRenderer);
         player.setPosition(8, 4.5f);
+        // Add items to player's inventory.
         Texture meatTexture = new Texture("HUD/meat.png");
-        player.getInventory().addItem(new MeatItem("Meat",meatTexture, 25f));
-        player.getInventory().addItem(new MeatItem("Meat",meatTexture, 25f));
+        player.getInventory().addItem(new MeatItem("Meat", meatTexture, 25f));
+        player.getInventory().addItem(new MeatItem("Meat", meatTexture, 25f));
 
+        Gdx.input.setInputProcessor(new InputAdapter() {
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                if (amountY > 0) {
+                    hud.nextSlot();
+                } else if (amountY < 0) {
+                    hud.prevSlot();
+                }
+                return true;
+            }
+        });
 
-        // Create goblin
-        goblin = new Goblin(camera, player, 11, 4.5f, 8, 12, 3, 6);
+        // Create goblin enemy.
+        goblin = new Goblin(player, 11, 4.5f, 8, 12, 3, 6);
         player.setTargetGoblin(goblin);
 
         String[] npcLines = {
@@ -68,12 +92,23 @@ public class Main extends ApplicationAdapter {
         };
         npc = new NPC(5, 5, npcLines);
 
-        // Create overlay texture for bush fade
+        // Create overlay texture for bush fade effect.
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmap.setColor(Color.WHITE);
         pixmap.fill();
         overlayTexture = new Texture(pixmap);
         pixmap.dispose();
+
+        // Initialize health bar renderers.
+        healthBarRendererPlayer = new HealthBarRenderer(camera);
+        healthBarRendererGoblin = new HealthBarRenderer(camera);
+
+        // Create a white texture for dash cooldown bar.
+        Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pix.setColor(Color.WHITE);
+        pix.fill();
+        whiteTexture = new Texture(pix);
+        pix.dispose();
 
         Gdx.gl.glClearColor(0, 0, 0, 1);
     }
@@ -83,62 +118,53 @@ public class Main extends ApplicationAdapter {
         float delta = Gdx.graphics.getDeltaTime();
         handleInput();
 
-        // Update logic
+        // Update game logic.
         player.update(delta);
         goblin.update(delta);
         npc.update(delta, new Vector2(player.getX(), player.getY()));
         updateCamera(delta);
 
-        // Clear screen
+        // Clear screen.
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // 1) Render base layers (Ground, Collision)
+        // 1) Render base layers (e.g., ground, collision layers).
         tileMapRenderer.renderBaseLayers(new int[]{0, 1});
 
-        // 2) Render Bush layer (shader if in bush, else normal)
+        // 2) Render bush layer (with shader if player is in a bush, else normally).
         if (player.isInBush()) {
             tileMapRenderer.renderBushWithShader(player, 50f);
         } else {
             tileMapRenderer.renderBushNoShader();
         }
 
-        // Gradual fade for bush overlay
+        // Gradual fade for bush overlay.
         if (player.isInBush()) {
             overlayAlpha = Math.min(overlayAlpha + overlayFadeSpeed * delta, overlayTarget);
         } else {
             overlayAlpha = Math.max(overlayAlpha - overlayFadeSpeed * delta, 0f);
         }
 
-        // 3) Render Goblin first (so tree top can cover it)
+        // 3) Render goblin (so that tree tops can cover it).
         batch.setProjectionMatrix(camera.combined);
-
         batch.begin();
         goblin.render(batch);
         batch.end();
 
-        // 4) Check if player is under tree top tile
+        // 4) Check if the player is under a tree top tile and render accordingly.
         if (tileMapRenderer.isCellTreeTop((int)player.getX(), (int)player.getY())) {
-            // Use shader
             tileMapRenderer.renderTreeTopWithShader(player, 90f);
         } else {
-            // Render tree top normally
             tileMapRenderer.renderTreeTopNoShader();
         }
-        //hud
-        if(Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            if(!player.getInventory().getItems().isEmpty()) {
-                Item firstItem = player.getInventory().getItems().get(0);
-                firstItem.use(player);
-            }
-        }
-        // 5) Then render player and NPC
+
+        // 5) Render player and NPC.
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         player.render(batch);
         npc.render(batch);
         batch.end();
 
-        // 6) If overlayAlpha > 0, draw dim overlay for bush effect
+        // 6) Render bush overlay if applicable.
         if (overlayAlpha > 0f) {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
@@ -152,19 +178,43 @@ public class Main extends ApplicationAdapter {
             batch.end();
         }
 
-        // 7) Draw UI (health bars, dash bar)
+        // 7) Render HUD (inventory, dash cooldown).
         batch.setProjectionMatrix(camera.combined);
         hud.drawHUD(player);
         batch.begin();
-        goblin.renderHealthBar(batch);
-        player.renderHealthBar(batch);
         renderDashCooldown(batch);
-
         batch.end();
+
+        // 8) Render enhanced health bars using HealthBarRenderer.
+        // Render player's health bar above the player.
+        healthBarRendererPlayer.render(
+            player.getX(),
+            player.getY() + player.getSpriteHeight() / 2f + 0.2f, // 0.2f is a fixed offset above the sprite's top.
+            1f,
+            0.1f,
+            player.getHealth(),
+            player.getMaxHealth(),
+            delta
+        );
+        // Render goblin's health bar above the goblin.
+        if (!goblin.isDead()) {
+            healthBarRendererGoblin.render(
+                goblin.getX(),
+                goblin.getY() + 0.7f, // Adjust as needed (you could similarly use goblin.getSpriteHeight() if available)
+                1f,
+                0.1f,
+                goblin.getHealth(),
+                goblin.getMaxHealth(),
+                delta
+            );
+        }
+
     }
 
     /**
-     * Renders a bigger dash cooldown bar in orange.
+     * Renders a larger dash cooldown bar in orange.
+     *
+     * @param batch The SpriteBatch used for rendering.
      */
     private void renderDashCooldown(SpriteBatch batch) {
         float cooldown = player.getDashCooldown();
@@ -174,19 +224,19 @@ public class Main extends ApplicationAdapter {
         float percent = 1f - (timer / cooldown);
         if (percent < 0f) percent = 0f;
 
-        // Make it bigger and orange
+        // Dash bar dimensions and position.
         float barW = 2f;
         float barH = 0.2f;
         float barX = camera.position.x - camera.viewportWidth / 2f + 0.2f;
         float barY = camera.position.y + camera.viewportHeight / 2f - 0.4f;
 
-        // Background in gray
+        // Background in gray.
         batch.setColor(Color.GRAY);
-        batch.draw(player.getHealthBarTexture(), barX, barY, barW, barH);
+        batch.draw(whiteTexture, barX, barY, barW, barH);
 
-        // Fill portion in orange
+        // Filled portion in maroon.
         batch.setColor(Color.MAROON);
-        batch.draw(player.getHealthBarTexture(), barX, barY, barW * percent, barH);
+        batch.draw(whiteTexture, barX, barY, barW * percent, barH);
 
         batch.setColor(Color.WHITE);
     }
@@ -205,8 +255,9 @@ public class Main extends ApplicationAdapter {
 
         camera.update();
     }
+
     private void handleInput() {
-        // Sağ/sol ok tuşlarıyla slot değiştir
+        // Change inventory slot using left/right arrow keys.
         if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
             hud.nextSlot();
         }
@@ -214,7 +265,7 @@ public class Main extends ApplicationAdapter {
             hud.prevSlot();
         }
 
-        // 1,2,3,4 tuşlarıyla doğrudan slot seçimi
+        // Directly select inventory slot using number keys 1-4.
         if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
             hud.setSelectedSlot(0);
         }
@@ -228,7 +279,7 @@ public class Main extends ApplicationAdapter {
             hud.setSelectedSlot(3);
         }
 
-        // E tuşuna basılırsa seçili slottaki item'i kullan (yemek)
+        // Use the item in the selected slot when the E key is pressed (e.g., food).
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             useSelectedItem();
         }
@@ -236,12 +287,15 @@ public class Main extends ApplicationAdapter {
 
     private void useSelectedItem() {
         int slotIndex = hud.getSelectedSlot();
-        // Envanterde yeterince item var mı diye bak
-        if (slotIndex < player.getInventory().getItems().size()) {
-            Item item = player.getInventory().getItems().get(slotIndex);
+        List<Item> items = player.getInventory().getItems();
+        if (slotIndex < items.size()) {
+            Item item = items.get(slotIndex);
             if (item != null) {
                 item.use(player);
-                // MeatItem ise can artıracak ve kendini remove edecektir.
+                // Adjust the selected slot if needed after using an item.
+                if (hud.getSelectedSlot() >= items.size()) {
+                    hud.setSelectedSlot(Math.max(0, items.size() - 1));
+                }
             }
         }
     }
@@ -255,5 +309,8 @@ public class Main extends ApplicationAdapter {
         player.dispose();
         hud.dispose();
         tileMapRenderer.dispose();
+        healthBarRendererPlayer.dispose();
+        healthBarRendererGoblin.dispose();
+        whiteTexture.dispose();
     }
 }

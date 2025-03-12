@@ -17,7 +17,7 @@ public class MeatItem extends Item {
     public void use(Player player) {
         // increase hp
         player.increaseHealth(healAmount);
-
+        player.triggerHealEffect();
         System.out.println("Ate " + name + " -> +" + healAmount + " HP!");
 
         // if one use remove the item
