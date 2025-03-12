@@ -9,14 +9,8 @@ Pawn/pawn_animations.atlas
 Pawn/pawn_animations.png
 Player/knight_atlas.atlas
 Player/knight_atlas.png
-UI/Banner_Horizontal.png
-UI/Button_Blue_3Slides.png
-UI/Button_Blue_3Slides_Pressed.png
-UI/Button_Red_3Slides.png
-UI/Carved_9Slides.png
-UI/Ribbon_Blue_3Slides.png
-UI/Ribbon_Red_Connection_Left.png
-UI/Ribbon_Red_Connection_Right.png
+UI/mainmenu_ui.atlas
+UI/mainmenu_ui.png
 bubble.png
 deadanimation.atlas
 deadanimation.png
