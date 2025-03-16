@@ -127,6 +127,14 @@ public class Main extends ApplicationAdapter {
         // Clear screen.
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        // Render map layers and entities
+        renderWorld();
+
+        // Render HUD elements
+        renderHUD(delta);
+    }
+
+    private void renderWorld() {
         // 1) Render base layers (e.g., ground, collision layers).
         tileMapRenderer.renderBaseLayers(new int[]{0, 1});
 
@@ -139,9 +147,9 @@ public class Main extends ApplicationAdapter {
 
         // Gradual fade for bush overlay.
         if (player.isInBush()) {
-            overlayAlpha = Math.min(overlayAlpha + overlayFadeSpeed * delta, overlayTarget);
+            overlayAlpha = Math.min(overlayAlpha + overlayFadeSpeed * Gdx.graphics.getDeltaTime(), overlayTarget);
         } else {
-            overlayAlpha = Math.max(overlayAlpha - overlayFadeSpeed * delta, 0f);
+            overlayAlpha = Math.max(overlayAlpha - overlayFadeSpeed * Gdx.graphics.getDeltaTime(), 0f);
         }
 
         // 3) Render goblin (so that tree tops can cover it).
@@ -177,38 +185,44 @@ public class Main extends ApplicationAdapter {
             batch.setColor(Color.WHITE);
             batch.end();
         }
+    }
 
-        // 7) Render HUD (inventory, dash cooldown).
-        batch.setProjectionMatrix(camera.combined);
+    private void renderHUD(float delta) {
+        // Render inventory HUD
         hud.drawHUD(player);
+
+        // Render dash cooldown
+        batch.setProjectionMatrix(camera.combined);
         batch.begin();
         renderDashCooldown(batch);
         batch.end();
 
-        // 8) Render enhanced health bars using HealthBarRenderer.
-        // Render player's health bar above the player.
+        // Render health bars
+        renderHealthBars(delta);
+    }
+
+    private void renderHealthBars(float delta) {
+        // Player health bar
         healthBarRendererPlayer.render(
             player.getX(),
-            player.getY() + player.getSpriteHeight() / 2f + 0.2f, // 0.2f is a fixed offset above the sprite's top.
-            1f,
-            0.1f,
+            player.getY() + player.getSpriteHeight() / 2f + 0.2f,
+            1f, 0.1f,
             player.getHealth(),
             player.getMaxHealth(),
             delta
         );
-        // Render goblin's health bar above the goblin.
-        if (!goblin.isDead()) {
+
+        // Goblin health bar - only if alive and not dying
+        if (!goblin.isDead() && !goblin.isDying()) {
             healthBarRendererGoblin.render(
                 goblin.getX(),
-                goblin.getY() + 0.7f, // Adjust as needed (you could similarly use goblin.getSpriteHeight() if available)
-                1f,
-                0.1f,
+                goblin.getY() + 0.7f,
+                1f, 0.1f,
                 goblin.getHealth(),
                 goblin.getMaxHealth(),
                 delta
             );
         }
-
     }
 
     /**

@@ -273,6 +273,10 @@ public class Goblin {
         y += ny * moveSpeed * delta;
     }
 
+    public boolean isDying() {
+        return isDying;
+    }
+
     /**
      * Renders the goblin.
      *

@@ -33,6 +33,9 @@ public class HealthBarRenderer {
      * @param delta         Delta time (for smooth animation)
      */
     public void render(float centerX, float centerY, float width, float height, float currentHealth, float maxHealth, float delta) {
+        // Update projection matrix every frame to match camera
+        shapeRenderer.setProjectionMatrix(camera.combined);
+
         float healthPercent = currentHealth / maxHealth;
         // Smooth animation: gradually adjust displayedHealthPercent toward the actual health percentage.
         displayedHealthPercent = MathUtils.lerp(displayedHealthPercent, healthPercent, delta * 10f);
@@ -40,7 +43,7 @@ public class HealthBarRenderer {
         float x = centerX - width / 2f;
         float y = centerY - height / 2f;
         float cornerRadius = height / 2f;
-        float padding = 0.02f;
+        float padding = 0.01f;
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
