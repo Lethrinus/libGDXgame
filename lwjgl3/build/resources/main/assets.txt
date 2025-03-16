@@ -11,6 +11,8 @@ Player/heal_animation.atlas
 Player/heal_animation.png
 Player/knight_atlas.atlas
 Player/knight_atlas.png
+UI/mainmenu_ui.atlas
+UI/mainmenu_ui.png
 bubble.png
 deadanimation.atlas
 deadanimation.png
