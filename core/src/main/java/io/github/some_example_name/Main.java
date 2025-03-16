@@ -8,6 +8,8 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -53,6 +55,7 @@ public class Main extends ApplicationAdapter {
         hud.initializeCamera(1200, 800);
         hud.loadTextures();
 
+
         // Set up camera: 16x9 world units.
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
@@ -84,6 +87,14 @@ public class Main extends ApplicationAdapter {
         // Create goblin enemy.
         goblin = new Goblin(player, 11, 4.5f, 8, 12, 3, 6);
         player.setTargetGoblin(goblin);
+        // goblin waypoints
+        ArrayList<Vector2> waypoints = new ArrayList<>();
+        waypoints.add(new Vector2(5, 5));
+        waypoints.add(new Vector2(5, 10));
+        waypoints.add(new Vector2(10, 10));
+        waypoints.add(new Vector2(10, 5));
+        goblin.setPatrolWaypoints(waypoints);
+        this.goblin = goblin;
 
         String[] npcLines = {
             "hello adventurer!",

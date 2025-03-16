@@ -8,6 +8,9 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * A basic Goblin enemy with patrol, chase, and attack states.
  * After the death animation finishes, the goblin disappears after a delay.
@@ -50,6 +53,21 @@ public class Goblin {
     private float attackDuration = 0.4f;
     private float attackDamage = 10f;
     private float attackKnockbackForce = 3f;
+
+
+    // Attack cooldown
+    private float attackCooldownTimer = 0f;
+    private float attackCooldownDuration = 0.6f; // Time between attacks
+    private float minAttackDistance = 0.8f; // Minimum distance to maintain when attacking
+    // Add these fields to the Goblin class
+    private List<Vector2> patrolWaypoints = new ArrayList<>();
+    private int currentWaypointIndex = 0;
+    private boolean usingWaypoints = false;
+    private float waypointPauseDuration = 2.0f;
+    private float currentPauseTime = 0f;
+    private boolean isPaused = false;
+    private float lookAroundTimer = 0f;
+    private float lookDirection = 1f; // 1 for right, -1 for left
 
     // Red flash effect.
     private float redFlashDuration = 0.2f;
@@ -94,7 +112,7 @@ public class Goblin {
 
         // Build idle animation.
         TextureRegion idleRow = new TextureRegion(atlas, 2, 194, 1344, 190);
-        idleAnimation = buildAnimation(idleRow, 7, 0.3f, Animation.PlayMode.LOOP);
+        idleAnimation = buildAnimation(idleRow, 7, 0.1f, Animation.PlayMode.LOOP);
         currentMovementAnim = idleAnimation;
 
         // Build attack animations.
@@ -142,13 +160,20 @@ public class Goblin {
         patrolTargetY = MathUtils.random(patrolMinY, patrolMaxY);
     }
 
-    /**
-     * Applies damage, knockback, and red flash effect to the goblin.
-     *
-     * @param damage         Damage amount.
-     * @param knockbackForce Force of the knockback.
-     * @param angleDegrees   Direction of the knockback in degrees.
-     */
+    public void setPatrolWaypoints(List<Vector2> waypoints) {
+        if (waypoints != null && !waypoints.isEmpty()) {
+            this.patrolWaypoints = new ArrayList<>(waypoints);
+            this.currentWaypointIndex = 0;
+            this.usingWaypoints = true;
+        }
+    }
+
+    private void moveToNextWaypoint() {
+        currentWaypointIndex = (currentWaypointIndex + 1) % patrolWaypoints.size();
+        isPaused = true;
+        currentPauseTime = 0f;
+    }
+
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
         if (health < 0) health = 0;
@@ -174,6 +199,10 @@ public class Goblin {
             return;
         }
 
+        // Update attack cooldown timer
+        if (attackCooldownTimer > 0) {
+            attackCooldownTimer -= delta;
+        }
 
         // Trigger death if health is depleted.
         if (health <= 0 && !isDying) {
@@ -198,6 +227,8 @@ public class Goblin {
             if (attackStateTime >= attackDuration) {
                 isAttacking = false;
                 attackExecuted = false;
+                // Reset attack cooldown when attack finishes
+                attackCooldownTimer = attackCooldownDuration;
             }
             return;
         }
@@ -210,8 +241,8 @@ public class Goblin {
         // Bush mechanic: if player is in a bush, goblin continues patrolling.
         if (player.isInBush()) {
             state = State.PATROL;
-        } else if (distToPlayer < attackRadius) {
-            // Initiate attack if close enough.
+        } else if (distToPlayer < attackRadius && attackCooldownTimer <= 0) {
+            // Only initiate attack if cooldown has expired
             isAttacking = true;
             attackStateTime = 0f;
             attackExecuted = false;
@@ -230,16 +261,55 @@ public class Goblin {
 
         switch (state) {
             case PATROL:
-                float pdx = patrolTargetX - x;
-                float pdy = patrolTargetY - y;
-                if (Math.abs(pdx) < 0.1f && Math.abs(pdy) < 0.1f) {
-                    pickRandomPatrolTarget();
+                if (usingWaypoints) {
+                    // Waypoint-based patrol
+                    if (isPaused) {
+                        // Pause at waypoint
+                        currentPauseTime += delta;
+                        lookAroundTimer += delta;
+
+                        // Look around while paused, but use idle animation
+                        if (lookAroundTimer >= 0.8f) {
+                            lookDirection *= -1;
+                            lookAroundTimer = 0f;
+                        }
+
+                        // Use idle animation when paused instead of run animation
+                        currentMovementAnim = idleAnimation;
+
+                        // When pause is over, continue to next waypoint
+                        if (currentPauseTime >= waypointPauseDuration) {
+                            isPaused = false;
+                        }
+                    } else {
+                        // Move to current waypoint
+                        Vector2 waypoint = patrolWaypoints.get(currentWaypointIndex);
+                        float wpDx = waypoint.x - x;
+                        float wpDy = waypoint.y - y;
+
+                        if (Math.abs(wpDx) < 0.1f && Math.abs(wpDy) < 0.1f) {
+                            moveToNextWaypoint();
+                        } else {
+                            moveTowards(waypoint.x, waypoint.y, speed, delta);
+                            currentMovementAnim = (wpDx < 0) ? runLeft : runRight;
+                        }
+                    }
+                } else {
+                    // Original random patrol behavior
+                    float pdx = patrolTargetX - x;
+                    float pdy = patrolTargetY - y;
+                    if (Math.abs(pdx) < 0.1f && Math.abs(pdy) < 0.1f) {
+                        pickRandomPatrolTarget();
+                    }
+                    moveTowards(patrolTargetX, patrolTargetY, speed, delta);
+                    currentMovementAnim = (pdx < 0) ? runLeft : runRight;
                 }
-                moveTowards(patrolTargetX, patrolTargetY, speed, delta);
-                currentMovementAnim = (pdx < 0) ? runLeft : runRight;
                 break;
             case CHASE:
-                moveTowards(player.getX(), player.getY(), speed * 1.4f, delta);
+                // Only move closer if beyond minimum attack distance
+                if (distToPlayer > minAttackDistance) {
+                    moveTowards(player.getX(), player.getY(), speed * 1.4f, delta);
+                }
                 currentMovementAnim = (dxP < 0) ? runLeft : runRight;
                 break;
             case IDLE:
