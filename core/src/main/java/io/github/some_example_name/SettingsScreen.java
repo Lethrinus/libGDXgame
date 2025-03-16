@@ -1,10 +1,8 @@
 package io.github.some_example_name;
-
-import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Cursor;
-import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
@@ -12,48 +10,36 @@ import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
-import com.badlogic.gdx.scenes.scene2d.ui.Image;
-import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.ui.Skin;
-import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.*;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
-import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.math.Interpolation;
 
-public class MainMenu extends Game {
+public class SettingsScreen implements Screen {
+    private final MainMenu mainMenu;
     private Stage stage;
     private TextureAtlas atlas;
     private Skin skin;
     private BitmapFont font, titleFont;
     private float screenWidth = 1200;
     private float screenHeight = 800;
-    private Pixmap cursorPixmap;
+
+    public SettingsScreen(MainMenu mainMenu) {
+        this.mainMenu = mainMenu;
+    }
+
     @Override
-    public void create() {
-        // Set up stage with FitViewport for consistent UI scaling
+    public void show() {
         stage = new Stage(new FitViewport(screenWidth, screenHeight));
         Gdx.input.setInputProcessor(stage);
-        // Only create cursor if it hasn't been created already
-        if (cursorPixmap == null) {
-            cursorPixmap = new Pixmap(Gdx.files.internal("HUD/cursor.png"));
-            Cursor customCursor = Gdx.graphics.newCursor(cursorPixmap, 0, 0);
-            Gdx.graphics.setCursor(customCursor);
-            // Don't dispose pixmap here anymore
-        }
-        // Load texture atlas
+
         atlas = new TextureAtlas(Gdx.files.internal("UI/mainmenu_ui.atlas"));
 
-        // Create fonts
         createFonts();
-
-        // Create UI skin and styles
         createSkin();
-
-        // Build the menu UI
-        buildMenuUI();
+        createUI();
     }
 
     private void createFonts() {
@@ -67,9 +53,9 @@ public class MainMenu extends Game {
         parameter.borderColor = new Color(0.2f, 0.2f, 0.4f, 1);
         font = generator.generateFont(parameter);
 
-        // Title font for "Balls of Steel"
-        parameter.size = 40;
-        parameter.borderWidth = 2;
+        // Title font
+        parameter.size = 48;
+        parameter.borderWidth = 3;
         titleFont = generator.generateFont(parameter);
 
         generator.dispose();
@@ -80,7 +66,7 @@ public class MainMenu extends Game {
         skin.add("default-font", font);
         skin.add("title-font", titleFont);
 
-        // Blue button style (normal)
+        // Button styles
         TextButton.TextButtonStyle blueButtonStyle = new TextButton.TextButtonStyle();
         blueButtonStyle.up = new TextureRegionDrawable(atlas.findRegion("Button_Blue_3Slides"));
         blueButtonStyle.down = new TextureRegionDrawable(atlas.findRegion("Button_Blue_3Slides_Pressed"));
@@ -88,95 +74,94 @@ public class MainMenu extends Game {
         blueButtonStyle.fontColor = Color.WHITE;
         skin.add("blue", blueButtonStyle);
 
-        // Red button style (for exit)
-        TextButton.TextButtonStyle redButtonStyle = new TextButton.TextButtonStyle();
-        redButtonStyle.up = new TextureRegionDrawable(atlas.findRegion("Button_Red_3Slides"));
-        redButtonStyle.down = new TextureRegionDrawable(atlas.findRegion("Button_Blue_3Slides_Pressed"));
-        redButtonStyle.font = font;
-        redButtonStyle.fontColor = Color.WHITE;
-        skin.add("red", redButtonStyle);
+        // Slider style
+        Slider.SliderStyle sliderStyle = new Slider.SliderStyle();
+        sliderStyle.background = new TextureRegionDrawable(atlas.findRegion("Button_Blue_3Slides"));
+        sliderStyle.knob = new TextureRegionDrawable(atlas.findRegion("Button_Red_3Slides"));
+        skin.add("default-horizontal", sliderStyle);
 
-        // Title label style
+        // Label styles
         Label.LabelStyle titleStyle = new Label.LabelStyle(titleFont, Color.WHITE);
         skin.add("title", titleStyle);
+
+        Label.LabelStyle normalStyle = new Label.LabelStyle(font, Color.WHITE);
+        skin.add("default", normalStyle);
     }
 
-    private void buildMenuUI() {
-        // Main table that fills the screen
-        Table mainTable = new Table();
-        mainTable.setFillParent(true);
-        stage.addActor(mainTable);
-
-        // Ribbon - positioned on the left side
+    private void createUI() {
+        // Ribbon - in upper left
         Image ribbon = new Image(atlas.findRegion("Ribbon_Blue_3Slides"));
-        ribbon.setScale(2f);
-        ribbon.setPosition(50, screenHeight - 250);
+        ribbon.setScale(1.6f);
+        ribbon.setScaleX(2.0f);
+        ribbon.setPosition(50, screenHeight - 180);
         stage.addActor(ribbon);
 
-        // "Balls of Steel" text placed on the ribbon
-        Label titleLabel = new Label("Balls of Steel", skin, "title");
-        titleLabel.setPosition(130, screenHeight - 190);
+        // Title - in upper left
+        Label titleLabel = new Label("Settings", skin, "title");
+        titleLabel.setPosition(130, screenHeight - 150);
         stage.addActor(titleLabel);
 
-        // Button table - positioned on the right side
+        // Button table on the right
         Table buttonTable = new Table();
-        buttonTable.defaults().width(300).height(80).pad(10);
         buttonTable.setPosition(screenWidth - 350, screenHeight / 2);
         stage.addActor(buttonTable);
 
-        // Create buttons
-        TextButton playButton = new TextButton("Play Game", skin, "blue");
-        TextButton optionsButton = new TextButton("Options", skin, "blue");
-        TextButton creditsButton = new TextButton("Credits", skin, "blue");
-        TextButton quitButton = new TextButton("Exit", skin, "red");
+        // Volume controls
+        Table volumeTable = new Table();
+        Label volumeLabel = new Label("Volume       ", skin);
+        final Label volumeValueLabel = new Label("50", skin);
 
-        // Add hover animations to buttons
-        addHoverEffect(playButton);
-        addHoverEffect(optionsButton);
-        addHoverEffect(creditsButton);
-        addHoverEffect(quitButton);
+        Slider volumeSlider = new Slider(0, 100, 1, false, skin);
+        volumeSlider.setValue(50);
+        volumeSlider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                Slider slider = (Slider) actor;
+                volumeValueLabel.setText(Integer.toString((int) slider.getValue()));
+            }
+        });
 
-        // Add buttons to table
-        buttonTable.add(playButton).row();
-        buttonTable.add(optionsButton).row();
-        buttonTable.add(creditsButton).row();
-        buttonTable.add(quitButton).row();
+        volumeTable.add(volumeLabel).padRight(20);
+        volumeTable.add(volumeSlider).width(300);
+        volumeTable.add(volumeValueLabel).width(50).padLeft(10);
 
-        // Button click handlers
-        playButton.addListener(new ClickListener() {
+        // Resolution controls
+        Table resolutionTable = new Table();
+        final Label resolutionLabel = new Label("Resolution      ", skin);
+
+        final TextButton resolutionButton = new TextButton("1200x800", skin, "blue");
+        addHoverEffect(resolutionButton);
+
+        resolutionTable.add(resolutionLabel);
+        resolutionTable.add(resolutionButton).width(300);
+
+        // Back button
+        TextButton backButton = new TextButton("Back", skin, "blue");
+        addHoverEffect(backButton);
+
+        // Add all components to button table with spacing
+        buttonTable.add(volumeTable).pad(20).row();
+        buttonTable.add(resolutionTable).pad(20).row();
+        buttonTable.add(backButton).width(200).pad(30);
+
+        // Fix back button handler
+        backButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 stage.addAction(Actions.sequence(
                     Actions.fadeOut(0.5f),
                     Actions.run(() -> {
-                        setScreen(new GameScreen(MainMenu.this));
-                    })
-                ));
-            }
-        });
-
-        quitButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                Gdx.app.exit();
-            }
-        });
-
-        optionsButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                stage.addAction(Actions.sequence(
-                    Actions.fadeOut(0.5f),
-                    Actions.run(() -> {
-                        setScreen(new SettingsScreen(MainMenu.this));
+                        // Properly dispose resources before returning to main menu
+                        dispose();
+                        // Call create() on MainMenu to reinitialize everything
+                        mainMenu.create();
+                        mainMenu.setScreen(null);
                     })
                 ));
             }
         });
     }
-    public void returnToMainMenu() {
-        setScreen(null);  // Remove any active screen
-    }
+
     private void addHoverEffect(final Actor actor) {
         actor.addListener(new ClickListener() {
             @Override
@@ -192,15 +177,12 @@ public class MainMenu extends Game {
     }
 
     @Override
-    public void render() {
-        ScreenUtils.clear(0.1f, 0.1f, 0.2f, 1);
+    public void render(float delta) {
+        Gdx.gl.glClearColor(0.1f, 0.1f, 0.2f, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        float delta = Gdx.graphics.getDeltaTime();
         stage.act(delta);
         stage.draw();
-
-        // Call render on the active screen (if set)
-        super.render();
     }
 
     @Override
@@ -209,14 +191,20 @@ public class MainMenu extends Game {
     }
 
     @Override
+    public void pause() {}
+
+    @Override
+    public void resume() {}
+
+    @Override
+    public void hide() {}
+
+    @Override
     public void dispose() {
         if (stage != null) stage.dispose();
         if (atlas != null) atlas.dispose();
         if (skin != null) skin.dispose();
         if (font != null) font.dispose();
         if (titleFont != null) titleFont.dispose();
-
-
-        }
     }
-
+}
