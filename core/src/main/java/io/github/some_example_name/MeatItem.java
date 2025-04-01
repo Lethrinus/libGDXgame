@@ -3,7 +3,8 @@ package io.github.some_example_name;
 import com.badlogic.gdx.graphics.Texture;
 
 /**
- * meat item example.
+ * An item that heals the player when used.
+ * Also displays a healing animation when consumed.
  */
 public class MeatItem extends Item {
     private float healAmount;
@@ -15,12 +16,9 @@ public class MeatItem extends Item {
 
     @Override
     public void use(Player player) {
-        // increase hp
         player.increaseHealth(healAmount);
         player.triggerHealEffect();
-        System.out.println("Ate " + name + " -> +" + healAmount + " HP!");
-
-        // if one use remove the item
         player.getInventory().removeItem(this);
+        System.out.println(name + " consumed! Player healed for " + healAmount + " points.");
     }
 }

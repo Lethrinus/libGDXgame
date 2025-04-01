@@ -8,17 +8,11 @@ import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Main game class.
- * Features:
- *  - Gradual fade overlay when the player is in a bush.
- *  - Conditional tree top shader if the player is under a tree tile.
- *  - A larger dash cooldown bar in orange.
- *  - Enhanced health bar rendering.
+ * Main game class using Factory Pattern for entity creation.
  */
 public class Main extends ApplicationAdapter {
     private SpriteBatch batch;
@@ -30,9 +24,9 @@ public class Main extends ApplicationAdapter {
     private InventoryHUD hud;
     // Overlay for bush dim effect.
     private Texture overlayTexture;
-    private float overlayAlpha = 0f;          // Current alpha value.
-    private final float overlayTarget = 0.3f;   // Maximum alpha value.
-    private final float overlayFadeSpeed = 1f;  // Fade speed.
+    private float overlayAlpha = 0f;
+    private final float overlayTarget = 0.3f;
+    private final float overlayFadeSpeed = 1f;
 
     // Health bar renderers for player and goblin.
     private HealthBarRenderer healthBarRendererPlayer;
@@ -40,9 +34,15 @@ public class Main extends ApplicationAdapter {
     // White texture used for dash cooldown bar.
     private Texture whiteTexture;
 
+    // Entity factory
+    private EntityFactory entityFactory;
+
     @Override
     public void create() {
         batch = new SpriteBatch();
+
+        // Initialize the entity factory
+        entityFactory = new GameEntityFactory();
 
         // Optional custom cursor.
         Pixmap cursorPixmap = new Pixmap(Gdx.files.internal("HUD/cursor.png"));
@@ -55,7 +55,6 @@ public class Main extends ApplicationAdapter {
         hud.initializeCamera(1200, 800);
         hud.loadTextures();
 
-
         // Set up camera: 16x9 world units.
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 16, 9);
@@ -64,13 +63,8 @@ public class Main extends ApplicationAdapter {
         // Load tile map.
         tileMapRenderer = new TileMapRenderer(camera, "maps/tileset.tmx");
 
-        // Create player at center.
-        player = new Player(camera, tileMapRenderer);
-        player.setPosition(8, 4.5f);
-        // Add items to player's inventory.
-        Texture meatTexture = new Texture("HUD/meat.png");
-        player.getInventory().addItem(new MeatItem("Meat", meatTexture, 25f));
-        player.getInventory().addItem(new MeatItem("Meat", meatTexture, 25f));
+        // Create player using factory
+        player = entityFactory.createPlayer(camera, tileMapRenderer, 8, 4.5f);
 
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
@@ -84,24 +78,24 @@ public class Main extends ApplicationAdapter {
             }
         });
 
-        // Create goblin enemy.
-        goblin = new Goblin(player, 11, 4.5f, 8, 12, 3, 6);
-        player.setTargetGoblin(goblin);
-        // goblin waypoints
+        // Create goblin using factory
         ArrayList<Vector2> waypoints = new ArrayList<>();
         waypoints.add(new Vector2(5, 5));
         waypoints.add(new Vector2(5, 10));
         waypoints.add(new Vector2(10, 10));
         waypoints.add(new Vector2(10, 5));
-        goblin.setPatrolWaypoints(waypoints);
-        this.goblin = goblin;
 
+        goblin = entityFactory.createPatrollingGoblin(
+            player, 11, 4.5f, 8, 12, 3, 6, waypoints);
+        player.setTargetGoblin(goblin);
+
+        // Create NPC using factory
         String[] npcLines = {
             "hello adventurer!",
             "be careful out there.",
             "press e to talk."
         };
-        npc = new NPC(5, 5, npcLines);
+        npc = entityFactory.createNPC(5, 5, npcLines);
 
         // Create overlay texture for bush fade effect.
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
