@@ -12,13 +12,23 @@ public class HealthBarRenderer {
     private ShapeRenderer shapeRenderer;
     private OrthographicCamera camera;
     private float displayedHealthPercent;
+    // New flag to indicate enemy color scheme (e.g., goblin)
+    private boolean enemyColorScheme;
 
+    // Default constructor for player health bar (normal color scheme)
     public HealthBarRenderer(OrthographicCamera camera) {
         this.camera = camera;
         shapeRenderer = new ShapeRenderer();
         shapeRenderer.setAutoShapeType(true);
         shapeRenderer.setProjectionMatrix(camera.combined);
         displayedHealthPercent = 1f;
+        enemyColorScheme = false;
+    }
+
+    // Constructor with enemy mode flag
+    public HealthBarRenderer(OrthographicCamera camera, boolean enemyColorScheme) {
+        this(camera);
+        this.enemyColorScheme = enemyColorScheme;
     }
 
     /**
@@ -51,12 +61,13 @@ public class HealthBarRenderer {
         shapeRenderer.setColor(Color.DARK_GRAY);
         drawRoundedRect(x, y, width, height, cornerRadius);
 
-        // Draw fill: gradient color based on health percentage (Red -> Yellow -> Green)
+        // Calculate fill dimensions
         float fillWidth = (width - padding * 2) * displayedHealthPercent;
         float fillX = x + padding;
         float fillY = y + padding;
         float fillHeight = height - padding * 2;
 
+        // Use custom color scheme if enemyColorScheme is enabled
         shapeRenderer.setColor(getHealthColor(displayedHealthPercent));
         if (fillWidth > 0) {
             drawRoundedRect(fillX, fillY, fillWidth, fillHeight, cornerRadius * 0.8f);
@@ -67,15 +78,22 @@ public class HealthBarRenderer {
 
     /**
      * Calculates the color based on health percentage.
-     * 0% → Red, 50% → Yellow, 100% → Green.
+     * For player (normal mode): 0% → Red, 50% → Yellow, 100% → Green.
+     * For enemy mode: we use a gradient from Green (full health) to Yellow (low health) to avoid red.
      */
     private Color getHealthColor(float percent) {
-        if (percent > 0.5f) {
-            // Interpolate from yellow to green.
-            return new Color(MathUtils.lerp(1f, 0f, (percent - 0.5f) * 2), 1f, 0f, 1f);
+        if (!enemyColorScheme) {
+            if (percent > 0.5f) {
+                // Interpolate from yellow to green.
+                return new Color(MathUtils.lerp(1f, 0f, (percent - 0.5f) * 2), 1f, 0f, 1f);
+            } else {
+                // Interpolate from red to yellow.
+                return new Color(1f, MathUtils.lerp(0f, 1f, percent * 2), 0f, 1f);
+            }
         } else {
-            // Interpolate from red to yellow.
-            return new Color(1f, MathUtils.lerp(0f, 1f, percent * 2), 0f, 1f);
+            // For enemy (goblin), use a gradient from green (full) to yellow (empty)
+            // When percent is 1.0, color = (0,1,0) i.e. green; when 0.0, color = (1,1,0) i.e. yellow.
+            return new Color(MathUtils.lerp(0f, 1f, 1 - percent), 1f, 0f, 1f);
         }
     }
 

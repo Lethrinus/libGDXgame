@@ -7,23 +7,21 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A basic Goblin enemy with patrol, chase, and attack states.
- * After the death animation finishes, the goblin disappears after a delay.
+ * Goblin enemy class with AI behavior refactored to use the Strategy Pattern.
+ * It supports patrol, chase, and attack behaviors.
  */
 public class Goblin {
-    private enum State { IDLE, PATROL, CHASE, ATTACK }
-    private State state = State.PATROL;
-
+    // Position and movement
     private float x, y;
     private float speed = 2.0f;
 
-    // Patrol boundaries.
-    private float patrolMinX, patrolMaxX, patrolMinY, patrolMaxY, patrolTargetX, patrolTargetY;
+    // Patrol boundaries and target
+    private float patrolMinX, patrolMaxX, patrolMinY, patrolMaxY;
+    private float patrolTargetX, patrolTargetY;
 
     // Distance thresholds.
     private float alertRadius = 4.0f;
@@ -31,7 +29,8 @@ public class Goblin {
 
     // Animations.
     private Texture atlas;
-    private Animation<TextureRegion> idleAnimation, runRight, runLeft, attackRight, attackLeft, attackUp, attackDown, currentMovementAnim, currentAttackAnim;
+    private Animation<TextureRegion> idleAnimation, runRight, runLeft, attackRight, attackLeft, attackUp, attackDown;
+    private Animation<TextureRegion> currentMovementAnim, currentAttackAnim;
 
     private float movementStateTime = 0f;
     private float attackStateTime = 0f;
@@ -39,6 +38,7 @@ public class Goblin {
 
     private float scale = 1f / 72f;
 
+    // Reference to the player
     private Player player;
 
     // Health and knockback.
@@ -54,12 +54,12 @@ public class Goblin {
     private float attackDamage = 10f;
     private float attackKnockbackForce = 3f;
 
-
-    // Attack cooldown
+    // Attack cooldown.
     private float attackCooldownTimer = 0f;
-    private float attackCooldownDuration = 0.6f; // Time between attacks
-    private float minAttackDistance = 0.8f; // Minimum distance to maintain when attacking
-    // Add these fields to the Goblin class
+    private float attackCooldownDuration = 0.6f;
+    private float minAttackDistance = 0.8f;
+
+    // Patrol waypoints.
     private List<Vector2> patrolWaypoints = new ArrayList<>();
     private int currentWaypointIndex = 0;
     private boolean usingWaypoints = false;
@@ -80,17 +80,24 @@ public class Goblin {
     private boolean isDead = false;
     private Texture deathTexture;
 
-    // Time after death animation finishes.
+    // Death disappearance delay.
     private float deathWaitTime = 0f;
-    private float deathDisappearDelay = 5f; // seconds.
+    private float deathDisappearDelay = 5f;
 
-    public float getX() { return x; }
-    public float getY() { return y; }
-    public float getHealth() { return health; }
-    public float getMaxHealth() { return maxHealth; }
-    public boolean isDead() {
-        return isDead;
-    }
+    // Strategy Pattern for AI behavior.
+    private GoblinState currentState;
+
+    /**
+     * Constructs a Goblin enemy.
+     *
+     * @param player       Reference to the player.
+     * @param startX       Initial X position.
+     * @param startY       Initial Y position.
+     * @param patrolMinX   Minimum X boundary for patrol.
+     * @param patrolMaxX   Maximum X boundary for patrol.
+     * @param patrolMinY   Minimum Y boundary for patrol.
+     * @param patrolMaxY   Maximum Y boundary for patrol.
+     */
     public Goblin(Player player,
                   float startX, float startY,
                   float patrolMinX, float patrolMaxX,
@@ -105,7 +112,7 @@ public class Goblin {
 
         atlas = new Texture(Gdx.files.internal("Goblin/goblin_animations.png"));
 
-        // Build running animation.
+        // Build running animations.
         TextureRegion runRow = new TextureRegion(atlas, 2, 2, 1152, 190);
         runRight = buildAnimation(runRow, 6, 0.1f, Animation.PlayMode.LOOP);
         runLeft = mirrorAnimation(runRight);
@@ -130,8 +137,12 @@ public class Goblin {
         deathAnimation = buildAnimation(dead1, 14, 0.1f, Animation.PlayMode.NORMAL);
 
         pickRandomPatrolTarget();
+
+        // Initialize AI state to Patrol.
+        currentState = new PatrolState();
     }
 
+    // --------------------- Animation Helpers ---------------------
     private Animation<TextureRegion> buildAnimation(TextureRegion region, int numFrames, float frameDuration, Animation.PlayMode mode) {
         int w = region.getRegionWidth() / numFrames;
         int h = region.getRegionHeight();
@@ -155,17 +166,10 @@ public class Goblin {
         return anim;
     }
 
+    // --------------------- Patrol Helpers ---------------------
     private void pickRandomPatrolTarget() {
         patrolTargetX = MathUtils.random(patrolMinX, patrolMaxX);
         patrolTargetY = MathUtils.random(patrolMinY, patrolMaxY);
-    }
-
-    public void setPatrolWaypoints(List<Vector2> waypoints) {
-        if (waypoints != null && !waypoints.isEmpty()) {
-            this.patrolWaypoints = new ArrayList<>(waypoints);
-            this.currentWaypointIndex = 0;
-            this.usingWaypoints = true;
-        }
     }
 
     private void moveToNextWaypoint() {
@@ -174,6 +178,40 @@ public class Goblin {
         currentPauseTime = 0f;
     }
 
+    private void moveTowards(float tx, float ty, float moveSpeed, float delta) {
+        float dx = tx - x;
+        float dy = ty - y;
+        float d2 = dx * dx + dy * dy;
+        if (d2 < 0.0001f) return;
+        float dist = (float) Math.sqrt(d2);
+        float nx = dx / dist;
+        float ny = dy / dist;
+        x += nx * moveSpeed * delta;
+        y += ny * moveSpeed * delta;
+    }
+
+    // --------------------- Public Methods ---------------------
+
+    /**
+     * Sets patrol waypoints for the goblin.
+     *
+     * @param waypoints A list of Vector2 positions for patrolling.
+     */
+    public void setPatrolWaypoints(List<Vector2> waypoints) {
+        if (waypoints != null && !waypoints.isEmpty()) {
+            this.patrolWaypoints = new ArrayList<>(waypoints);
+            this.currentWaypointIndex = 0;
+            this.usingWaypoints = true;
+        }
+    }
+
+    /**
+     * Applies damage, knockback, and triggers the red flash effect.
+     *
+     * @param damage         Amount of damage.
+     * @param knockbackForce Knockback force.
+     * @param angleDegrees   Direction of knockback in degrees.
+     */
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
         if (health < 0) health = 0;
@@ -183,14 +221,19 @@ public class Goblin {
         redFlashTimer = redFlashDuration;
     }
 
+    // --------------------- Update & Render ---------------------
+
+    /**
+     * Updates the goblin behavior using the current AI strategy.
+     *
+     * @param delta Time elapsed since last frame.
+     */
     public void update(float delta) {
         if (isDead) return;
 
-        // If dying, play death animation.
         if (isDying) {
             deathStateTime += delta;
             if (deathAnimation.isAnimationFinished(deathStateTime)) {
-                // After death animation, wait for a delay before marking as dead.
                 deathWaitTime += delta;
                 if (deathWaitTime >= deathDisappearDelay) {
                     isDead = true;
@@ -199,124 +242,33 @@ public class Goblin {
             return;
         }
 
-        // Update attack cooldown timer
         if (attackCooldownTimer > 0) {
             attackCooldownTimer -= delta;
         }
 
-        // Trigger death if health is depleted.
         if (health <= 0 && !isDying) {
             isDying = true;
             deathStateTime = 0f;
             return;
         }
 
-        if (isAttacking) {
-            // Handle attack animation timing.
-            attackStateTime += delta;
-            if (!attackExecuted && attackStateTime >= attackHitTime) {
-                float dx = player.getX() - x;
-                float dy = player.getY() - y;
-                float dist = (float)Math.sqrt(dx * dx + dy * dy);
-                if (dist <= attackRadius) {
-                    float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-                    player.takeDamage(attackDamage, attackKnockbackForce, angle);
-                    attackExecuted = true;
-                }
-            }
-            if (attackStateTime >= attackDuration) {
-                isAttacking = false;
-                attackExecuted = false;
-                // Reset attack cooldown when attack finishes
-                attackCooldownTimer = attackCooldownDuration;
-            }
-            return;
-        }
-
-        // Calculate distance to player.
         float dxP = player.getX() - x;
         float dyP = player.getY() - y;
-        float distToPlayer = (float)Math.sqrt(dxP * dxP + dyP * dyP);
+        float distToPlayer = (float) Math.sqrt(dxP * dxP + dyP * dyP);
 
-        // Bush mechanic: if player is in a bush, goblin continues patrolling.
+        // State selection logic based on player distance and conditions.
         if (player.isInBush()) {
-            state = State.PATROL;
+            currentState = new PatrolState();
         } else if (distToPlayer < attackRadius && attackCooldownTimer <= 0) {
-            // Only initiate attack if cooldown has expired
-            isAttacking = true;
-            attackStateTime = 0f;
-            attackExecuted = false;
-            float angle = MathUtils.atan2(dyP, dxP) * MathUtils.radiansToDegrees;
-            if (angle >= -45 && angle < 45) currentAttackAnim = attackRight;
-            else if (angle >= 45 && angle < 135) currentAttackAnim = attackUp;
-            else if (angle >= -135 && angle < -45) currentAttackAnim = attackDown;
-            else currentAttackAnim = attackLeft;
+            currentState = new AttackState();
         } else if (distToPlayer < alertRadius) {
-            // Chase the player.
-            state = State.CHASE;
+            currentState = new ChaseState();
         } else {
-            // Otherwise, patrol.
-            state = State.PATROL;
+            currentState = new PatrolState();
         }
 
-        switch (state) {
-            case PATROL:
-                if (usingWaypoints) {
-                    // Waypoint-based patrol
-                    if (isPaused) {
-                        // Pause at waypoint
-                        currentPauseTime += delta;
-                        lookAroundTimer += delta;
-
-                        // Look around while paused, but use idle animation
-                        if (lookAroundTimer >= 0.8f) {
-                            lookDirection *= -1;
-                            lookAroundTimer = 0f;
-                        }
-
-                        // Use idle animation when paused instead of run animation
-                        currentMovementAnim = idleAnimation;
-
-                        // When pause is over, continue to next waypoint
-                        if (currentPauseTime >= waypointPauseDuration) {
-                            isPaused = false;
-                        }
-                    } else {
-                        // Move to current waypoint
-                        Vector2 waypoint = patrolWaypoints.get(currentWaypointIndex);
-                        float wpDx = waypoint.x - x;
-                        float wpDy = waypoint.y - y;
-
-                        if (Math.abs(wpDx) < 0.1f && Math.abs(wpDy) < 0.1f) {
-                            moveToNextWaypoint();
-                        } else {
-                            moveTowards(waypoint.x, waypoint.y, speed, delta);
-                            currentMovementAnim = (wpDx < 0) ? runLeft : runRight;
-                        }
-                    }
-                } else {
-                    // Original random patrol behavior
-                    float pdx = patrolTargetX - x;
-                    float pdy = patrolTargetY - y;
-                    if (Math.abs(pdx) < 0.1f && Math.abs(pdy) < 0.1f) {
-                        pickRandomPatrolTarget();
-                    }
-                    moveTowards(patrolTargetX, patrolTargetY, speed, delta);
-                    currentMovementAnim = (pdx < 0) ? runLeft : runRight;
-                }
-                break;
-            case CHASE:
-                // Only move closer if beyond minimum attack distance
-                if (distToPlayer > minAttackDistance) {
-                    moveTowards(player.getX(), player.getY(), speed * 1.4f, delta);
-                }
-                currentMovementAnim = (dxP < 0) ? runLeft : runRight;
-                break;
-            case IDLE:
-            default:
-                currentMovementAnim = idleAnimation;
-                break;
-        }
+        // Delegate behavior update to the current state.
+        currentState.update(this, delta);
 
         // Apply knockback.
         if (knockback.len() > 0.01f) {
@@ -331,30 +283,13 @@ public class Goblin {
         if (redFlashTimer > 0) redFlashTimer -= delta;
     }
 
-    private void moveTowards(float tx, float ty, float moveSpeed, float delta) {
-        float dx = tx - x;
-        float dy = ty - y;
-        float d2 = dx * dx + dy * dy;
-        if (d2 < 0.0001f) return;
-        float dist = (float)Math.sqrt(d2);
-        float nx = dx / dist;
-        float ny = dy / dist;
-        x += nx * moveSpeed * delta;
-        y += ny * moveSpeed * delta;
-    }
-
-    public boolean isDying() {
-        return isDying;
-    }
-
     /**
      * Renders the goblin.
      *
-     * @param batch The SpriteBatch used for rendering.
+     * @param batch The SpriteBatch used for drawing.
      */
     public void render(SpriteBatch batch) {
         if (isDead) return;
-
         TextureRegion frame;
         if (isDying) {
             frame = deathAnimation.getKeyFrame(deathStateTime);
@@ -382,5 +317,130 @@ public class Goblin {
             deathTexture.dispose();
         }
         atlas.dispose();
+    }
+
+    // --------------------- Getters ---------------------
+    public float getX() { return x; }
+    public float getY() { return y; }
+    public float getHealth() { return health; }
+    public float getMaxHealth() { return maxHealth; }
+    public boolean isDead() { return isDead; }
+    public boolean isDying() { return isDying; }
+
+    // --------------------- Strategy Pattern States ---------------------
+
+    /**
+     * GoblinState interface for AI behavior.
+     */
+    private interface GoblinState {
+        void update(Goblin goblin, float delta);
+    }
+
+    /**
+     * PatrolState: The goblin patrols using either waypoints or random targets.
+     */
+    private class PatrolState implements GoblinState {
+        @Override
+        public void update(Goblin goblin, float delta) {
+            if (usingWaypoints) {
+                if (isPaused) {
+                    currentPauseTime += delta;
+                    lookAroundTimer += delta;
+                    if (lookAroundTimer >= 0.8f) {
+                        lookDirection *= -1;
+                        lookAroundTimer = 0f;
+                    }
+                    currentMovementAnim = idleAnimation;
+                    if (currentPauseTime >= waypointPauseDuration) {
+                        isPaused = false;
+                    }
+                } else {
+                    Vector2 waypoint = patrolWaypoints.get(currentWaypointIndex);
+                    float wpDx = waypoint.x - x;
+                    float wpDy = waypoint.y - y;
+                    if (Math.abs(wpDx) < 0.1f && Math.abs(wpDy) < 0.1f) {
+                        moveToNextWaypoint();
+                    } else {
+                        moveTowards(waypoint.x, waypoint.y, speed, delta);
+                        currentMovementAnim = (wpDx < 0) ? runLeft : runRight;
+                    }
+                }
+            } else {
+                float pdx = patrolTargetX - x;
+                float pdy = patrolTargetY - y;
+                if (Math.abs(pdx) < 0.1f && Math.abs(pdy) < 0.1f) {
+                    pickRandomPatrolTarget();
+                }
+                moveTowards(patrolTargetX, patrolTargetY, speed, delta);
+                currentMovementAnim = (pdx < 0) ? runLeft : runRight;
+            }
+        }
+    }
+
+    /**
+     * ChaseState: The goblin chases the player when within alert range.
+     */
+    private class ChaseState implements GoblinState {
+        @Override
+        public void update(Goblin goblin, float delta) {
+            float dx = player.getX() - x;
+            float dy = player.getY() - y;
+            float dist = (float) Math.sqrt(dx * dx + dy * dy);
+            if (dist > minAttackDistance) {
+                moveTowards(player.getX(), player.getY(), speed * 1.4f, delta);
+            }
+            currentMovementAnim = (dx < 0) ? runLeft : runRight;
+        }
+    }
+
+    /**
+     * AttackState: The goblin attacks the player.
+     */
+    private class AttackState implements GoblinState {
+        @Override
+        public void update(Goblin goblin, float delta) {
+            if (!isAttacking) {
+                isAttacking = true;
+                attackStateTime = 0f;
+                attackExecuted = false;
+                float dx = player.getX() - x;
+                float dy = player.getY() - y;
+                float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+                if (angle >= -45 && angle < 45) {
+                    currentAttackAnim = attackRight;
+                } else if (angle >= 45 && angle < 135) {
+                    currentAttackAnim = attackUp;
+                } else if (angle >= -135 && angle < -45) {
+                    currentAttackAnim = attackDown;
+                } else {
+                    currentAttackAnim = attackLeft;
+                }
+            }
+            attackStateTime += delta;
+            if (!attackExecuted && attackStateTime >= attackHitTime) {
+                float dx = player.getX() - x;
+                float dy = player.getY() - y;
+                float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                if (dist <= attackRadius) {
+                    float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+                    // Call player's takeDamage (or appropriate damage method)
+                    player.takeDamage(attackDamage, attackKnockbackForce, angle);
+                    attackExecuted = true;
+                }
+            }
+            if (attackStateTime >= attackDuration) {
+                isAttacking = false;
+                attackExecuted = false;
+                attackCooldownTimer = attackCooldownDuration;
+                float dx = player.getX() - x;
+                float dy = player.getY() - y;
+                float dist = (float) Math.sqrt(dx * dx + dy * dy);
+                if (dist < alertRadius) {
+                    currentState = new ChaseState();
+                } else {
+                    currentState = new PatrolState();
+                }
+            }
+        }
     }
 }
