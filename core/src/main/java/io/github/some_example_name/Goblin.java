@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Goblin enemy class with AI behavior refactored to use the Strategy Pattern.
+ * Goblin enemy class with AI behavior refactored using the Strategy Pattern.
  * It supports patrol, chase, and attack behaviors.
  */
 public class Goblin {
@@ -50,13 +50,13 @@ public class Goblin {
 
     private boolean attackExecuted = false;
     private float attackHitTime = 0.15f;
-    private float attackDuration = 0.4f;
+    private float attackDuration = 0.7f;
     private float attackDamage = 10f;
     private float attackKnockbackForce = 3f;
 
     // Attack cooldown.
     private float attackCooldownTimer = 0f;
-    private float attackCooldownDuration = 0.6f;
+    private float attackCooldownDuration = 0.8f;
     private float minAttackDistance = 0.8f;
 
     // Patrol waypoints.
@@ -124,12 +124,12 @@ public class Goblin {
 
         // Build attack animations.
         TextureRegion attackBRow = new TextureRegion(atlas, 2, 386, 1152, 190);
-        attackDown = buildAnimation(attackBRow, 6, 0.1f, Animation.PlayMode.NORMAL);
+        attackDown = buildAnimation(attackBRow, 6, 0.13f, Animation.PlayMode.NORMAL);
         TextureRegion attackRRow = new TextureRegion(atlas, 2, 578, 1152, 190);
-        attackRight = buildAnimation(attackRRow, 6, 0.1f, Animation.PlayMode.NORMAL);
+        attackRight = buildAnimation(attackRRow, 6, 0.13f, Animation.PlayMode.NORMAL);
         attackLeft = mirrorAnimation(attackRight);
         TextureRegion attackURow = new TextureRegion(atlas, 2, 770, 1152, 190);
-        attackUp = buildAnimation(attackURow, 6, 0.1f, Animation.PlayMode.NORMAL);
+        attackUp = buildAnimation(attackURow, 6, 0.13f, Animation.PlayMode.NORMAL);
 
         // Build death animation.
         deathTexture = new Texture(Gdx.files.internal("deadanimation.png"));
@@ -226,6 +226,8 @@ public class Goblin {
     /**
      * Updates the goblin behavior using the current AI strategy.
      *
+     * Note: If the goblin is already attacking, we do not change its state until the attack animation completes.
+     *
      * @param delta Time elapsed since last frame.
      */
     public void update(float delta) {
@@ -256,15 +258,17 @@ public class Goblin {
         float dyP = player.getY() - y;
         float distToPlayer = (float) Math.sqrt(dxP * dxP + dyP * dyP);
 
-        // State selection logic based on player distance and conditions.
-        if (player.isInBush()) {
-            currentState = new PatrolState();
-        } else if (distToPlayer < attackRadius && attackCooldownTimer <= 0) {
-            currentState = new AttackState();
-        } else if (distToPlayer < alertRadius) {
-            currentState = new ChaseState();
-        } else {
-            currentState = new PatrolState();
+        // Only change state if not already in an attack animation.
+        if (!isAttacking) {
+            if (player.isInBush()) {
+                currentState = new PatrolState();
+            } else if (distToPlayer < attackRadius && attackCooldownTimer <= 0) {
+                currentState = new AttackState();
+            } else if (distToPlayer < alertRadius) {
+                currentState = new ChaseState();
+            } else {
+                currentState = new PatrolState();
+            }
         }
 
         // Delegate behavior update to the current state.
@@ -395,10 +399,14 @@ public class Goblin {
 
     /**
      * AttackState: The goblin attacks the player.
+     * Once an attack starts, the full attack animation plays out.
+     * At the hit moment, damage is applied only if the player is within range.
+     * After the animation finishes, the goblin transitions to chase (if within alert range) or patrol.
      */
     private class AttackState implements GoblinState {
         @Override
         public void update(Goblin goblin, float delta) {
+            // Start the attack animation if not already started.
             if (!isAttacking) {
                 isAttacking = true;
                 attackStateTime = 0f;
@@ -417,17 +425,18 @@ public class Goblin {
                 }
             }
             attackStateTime += delta;
+            // At the hit moment, if the player is still in range, apply damage.
             if (!attackExecuted && attackStateTime >= attackHitTime) {
                 float dx = player.getX() - x;
                 float dy = player.getY() - y;
                 float dist = (float) Math.sqrt(dx * dx + dy * dy);
                 if (dist <= attackRadius) {
                     float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-                    // Call player's takeDamage (or appropriate damage method)
                     player.takeDamage(attackDamage, attackKnockbackForce, angle);
-                    attackExecuted = true;
                 }
+                attackExecuted = true;
             }
+            // Once the full attack animation completes, reset attack state and transition.
             if (attackStateTime >= attackDuration) {
                 isAttacking = false;
                 attackExecuted = false;
