@@ -1,0 +1,7 @@
+explosions_dynamite.png
+size:2048,512
+repeat:none
+Dynamite
+bounds:2,2,384,64
+Explosions
+bounds:2,68,1728,192

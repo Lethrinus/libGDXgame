@@ -9,16 +9,15 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import io.github.ballsofsteel.entity.*;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 import io.github.ballsofsteel.ui.InventoryHUD;
-import io.github.ballsofsteel.entity.Goblin;
-import io.github.ballsofsteel.entity.Item;
-import io.github.ballsofsteel.entity.NPC;
-import io.github.ballsofsteel.entity.Player;
 import io.github.ballsofsteel.factory.EntityFactory;
 import io.github.ballsofsteel.factory.GameEntityFactory;
 
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 public class CoreGame extends ApplicationAdapter {
     private SpriteBatch batch;
@@ -28,8 +27,8 @@ public class CoreGame extends ApplicationAdapter {
     private TileMapRenderer tileMapRenderer;
     private OrthographicCamera camera;
     private InventoryHUD hud;
-
-
+    private List<DynamiteGoblin> dynaList;
+    private GameEntityFactory factory;
     // Health bar renderers for player and goblin.
     private HealthBarRenderer healthBarRendererPlayer;
     // Use enemy mode for goblin so that its health bar uses a green-to-yellow gradient.
@@ -51,7 +50,9 @@ public class CoreGame extends ApplicationAdapter {
         EntityFactory entityFactory = new GameEntityFactory();
 
         // Create player using the factory.
-        player = entityFactory.createPlayer(camera, tileMapRenderer, 8, 4.5f);
+        factory   = new GameEntityFactory();
+        dynaList  = new ArrayList<>();
+        player    = factory.createPlayer(camera, tileMapRenderer, 8, 4.5f);
 
         // Set up HUD.
         hud = new InventoryHUD();
@@ -101,6 +102,7 @@ public class CoreGame extends ApplicationAdapter {
         player.update(delta);
         goblin.update(delta);
         npc.update(delta, new Vector2(player.getX(), player.getY()));
+        updateDynamiteGoblins(delta);
         updateCamera(delta);
 
         // Clear screen.
@@ -183,6 +185,7 @@ public class CoreGame extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         player.render(batch);
+        for (DynamiteGoblin d : dynaList) d.render(batch);
         npc.render(batch);
         batch.end();
 
@@ -241,6 +244,22 @@ public class CoreGame extends ApplicationAdapter {
                     hud.setSelectedSlot(Math.max(0, player.getInventory().getItems().size() - 1));
                 }
             }
+        }
+    }
+    private void updateDynamiteGoblins(float delta) {
+
+        // T basılırsa spawn
+        if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
+            float sx = player.getX() + 3f;
+            float sy = player.getY();
+            dynaList.add(factory.createDynamiteGoblin(player, sx, sy));
+        }
+
+        // güncelle & temizle
+        for (Iterator<DynamiteGoblin> it = dynaList.iterator(); it.hasNext();) {
+            DynamiteGoblin d = it.next();
+            d.update(delta);
+            if (d.isDead()) it.remove();
         }
     }
 

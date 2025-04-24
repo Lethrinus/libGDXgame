@@ -56,6 +56,9 @@ public class GameEntityFactory implements EntityFactory {
         return goblin;
     }
 
+    public DynamiteGoblin createDynamiteGoblin(Player player, float x, float y) {
+        return new DynamiteGoblin(player, x, y);
+    }
     @Override
     public NPC createNPC(float x, float y, String[] dialogueLines) {
         return new NPC(x, y, dialogueLines);

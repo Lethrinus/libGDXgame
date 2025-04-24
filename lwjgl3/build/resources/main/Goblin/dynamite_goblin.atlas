@@ -1,0 +1,9 @@
+dynamite_goblin.png
+size:2048,1024
+repeat:none
+idle_dynamite
+bounds:2,390,1344,192
+running_tnt
+bounds:2,2,1344,192
+throwing_tnt
+bounds:2,196,1344,192

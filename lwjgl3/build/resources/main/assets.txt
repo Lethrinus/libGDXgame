@@ -1,3 +1,7 @@
+Dynamite/explosions_dynamite.atlas
+Dynamite/explosions_dynamite.png
+Goblin/dynamite_goblin.atlas
+Goblin/dynamite_goblin.png
 Goblin/goblin_animations.atlas
 Goblin/goblin_animations.png
 HUD/cursor.png
