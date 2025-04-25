@@ -34,8 +34,8 @@ public class GameEntityFactory implements EntityFactory {
         Texture meatTexture = new Texture(Gdx.files.internal("HUD/meat.png"));
         player.getInventory().addItem(new MeatItem("Meat", meatTexture, 25f));
         player.getInventory().addItem(new MeatItem("Meat", meatTexture, 25f));
-        Texture gem = new Texture(Gdx.files.internal("HUD/meat.png"));
-        player.getInventory().addItem(new GemItem(gem));   // slot 0
+
+
 
     }
 
@@ -58,6 +58,9 @@ public class GameEntityFactory implements EntityFactory {
 
     public DynamiteGoblin createDynamiteGoblin(Player player, float x, float y) {
         return new DynamiteGoblin(player, x, y);
+    }
+    public BarrelBomber createBarrelBomber(Player p,float x,float y){
+        return new BarrelBomber(p,x,y);
     }
     @Override
     public NPC createNPC(float x, float y, String[] dialogueLines) {

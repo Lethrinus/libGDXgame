@@ -1,5 +1,7 @@
 Dynamite/explosions_dynamite.atlas
 Dynamite/explosions_dynamite.png
+Goblin/barrel_atlas.atlas
+Goblin/barrel_atlas.png
 Goblin/dynamite_goblin.atlas
 Goblin/dynamite_goblin.png
 Goblin/goblin_animations.atlas

@@ -1,0 +1,9 @@
+barrel_atlas.png
+size:1024,512
+repeat:none
+barrel_idle
+bounds:2,132,768,128
+barrel_running
+bounds:2,2,768,128
+tnt_explosion
+bounds:2,262,768,128

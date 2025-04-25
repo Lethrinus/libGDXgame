@@ -28,6 +28,7 @@ public class CoreGame extends ApplicationAdapter {
     private OrthographicCamera camera;
     private InventoryHUD hud;
     private List<DynamiteGoblin> dynaList;
+    private final List<BarrelBomber> barrelList = new ArrayList<>();
     private GameEntityFactory factory;
     // Health bar renderers for player and goblin.
     private HealthBarRenderer healthBarRendererPlayer;
@@ -185,6 +186,7 @@ public class CoreGame extends ApplicationAdapter {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         player.render(batch);
+        for (BarrelBomber bb : barrelList) bb.render(batch);
         for (DynamiteGoblin d : dynaList) d.render(batch);
         npc.render(batch);
         batch.end();
@@ -260,6 +262,17 @@ public class CoreGame extends ApplicationAdapter {
             DynamiteGoblin d = it.next();
             d.update(delta);
             if (d.isDead()) it.remove();
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
+            barrelList.add(factory.createBarrelBomber(
+                player, player.getX()+4f, player.getY()));
+        }
+
+// update
+        for (Iterator<BarrelBomber> it = barrelList.iterator(); it.hasNext();) {
+            BarrelBomber bb = it.next();
+            bb.update(delta);
+            if (bb.isFinished()) it.remove();
         }
     }
 
