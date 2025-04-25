@@ -239,6 +239,10 @@ public class Player {
         return tileMapRenderer.isCellBush(tileX, tileY);
     }
 
+    private int gold;
+    public void addGold(int n){ gold += n; }
+    public int  getGold(){ return gold; }
+
     /**
      * Applies damage, knockback, and red flash effect to the player.
      *

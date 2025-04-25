@@ -4,120 +4,93 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
+import java.util.List;
 
-
+/** BarrelBomber v3 – çarpışma önleme + büyük patlama. */
 public class BarrelBomber {
 
-    /* ───── static assets ───── */
-    private static Texture barrelSheet, boomSheet;
-    private static Animation<TextureRegion> runR, runL;
-    private static Animation<TextureRegion> fuseAnim;     // 3-frame “tnt_explosion”
-    private static Animation<TextureRegion> explodeAnim;  // 9-frame big boom
+    /* ---------- statik animasyon ---------- */
+    private static final Texture SHEET = new Texture(Gdx.files.internal("Goblin/barrel_atlas.png"));
+    private static final Texture BOOM  = new Texture(Gdx.files.internal("Dynamite/explosions_dynamite.png"));
+    private static final Animation<TextureRegion> runR, runL, explodeA;
+    static{
+        SHEET.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        BOOM .setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
 
-    private static void load() {
-        if (barrelSheet != null) return;
-
-        barrelSheet = new Texture(Gdx.files.internal("Goblin/barrel_atlas.png"));
-        boomSheet   = new Texture(Gdx.files.internal("Dynamite/explosions_dynamite.png"));
-        barrelSheet.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-        boomSheet.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-        runR      = row(barrelSheet, 2,   2, 768,128, 6, 0.35f);
-        runL      = mirror(runR);
-        fuseAnim  = row(barrelSheet, 2, 262, 384,128, 3, 0.3f);
-        explodeAnim = row(boomSheet, 2, 68, 1728,192, 9, 0.06f);
+        runR    = row(SHEET,2,2, 768,128,6,.10f);   runL = mirror(runR);
+        explodeA= row(BOOM ,2,68,1728,192,9,.07f);
     }
-    private static Animation<TextureRegion> row(Texture tex,int x,int y,int w,int h,
-                                                int n,float dur){
-        TextureRegion[][] sp = new TextureRegion(tex,x,y,w,h).split(w/n,h);
-        return new Animation<>(dur, sp[0]);
+    private static Animation<TextureRegion> row(Texture t,int x,int y,int w,int h,int n,float d){
+        return new Animation<>(d,new TextureRegion(t,x,y,w,h).split(w/n,h)[0]);
     }
     private static Animation<TextureRegion> mirror(Animation<TextureRegion> src){
-        TextureRegion[] k = src.getKeyFrames();
-        TextureRegion[] m = new TextureRegion[k.length];
-        for(int i=0;i<k.length;i++){ m[i]=new TextureRegion(k[i]); m[i].flip(true,false); }
-        return new Animation<>(src.getFrameDuration(), m);
+        TextureRegion[] k = src.getKeyFrames(), m=new TextureRegion[k.length];
+        for(int i=0;i<k.length;i++){ m[i]=new TextureRegion(k[i]); m[i].flip(true,false);}
+        return new Animation<>(src.getFrameDuration(),m);
     }
 
-    /* ───── runtime fields ───── */
-    private enum State { RUNNING, FUSE, EXPLODING }
-    private State state = State.RUNNING;
+    /* ---------- sabitler ---------- */
+    private static final float SCALE=1f/72f, BODY=192*SCALE, RADIUS=.45f;
 
+    /* ---------- ref / crowd ---------- */
     private final Player player;
-    private float x, baseY;
-    private float hopPhase;
-    private boolean facingLeft;
+    private final List<BarrelBomber> crowd;
 
-    private float fuseT, boomT;
+    /* ---------- state ---------- */
+    private float x,y, baseY, hop;
+    private float t, boomT;
+    private boolean exploding, facingLeft;
 
-    private static final float SPEED = 2f;
-    private static final float ATTACK_RANGE = 1.3f;
-    private static final float DAMAGE_R     = 1.5f;
-    private static final float DAMAGE_AMT   = 35f;
-    private static final float SCALE_BODY   = 1f/72f;
-    private static final float SCALE_BOOM   = 1.5f * SCALE_BODY;
-
-    public BarrelBomber(Player p,float sx,float sy){
-        load();
-        player = p; x=sx; baseY=sy;
+    public BarrelBomber(Player p, List<BarrelBomber> all, float sx,float sy){
+        player=p; crowd=all; x=sx; baseY=y=sy;
     }
 
-    /* ───── UPDATE ───── */
     public void update(float dt){
-        if(state==State.RUNNING)   updateRunning(dt);
-        else if(state==State.FUSE) updateFuse(dt);
-        else if(state==State.EXPLODING) boomT+=dt;
-    }
 
-    private void updateRunning(float dt){
+        if(exploding){ boomT+=dt; return; }
+
+        /* ---------- crowd separation ---------- */
+        for(BarrelBomber b:crowd){
+            if(b==this || b.exploding) continue;
+            float dx = x-b.x, dy = baseY-b.baseY, d2=dx*dx+dy*dy;
+            if(d2 < RADIUS*RADIUS*4){
+                float d=(float)Math.sqrt(d2);
+                if(d>0){ x+=dx/d*dt*1.5f; baseY+=dy/d*dt*1.5f; }
+            }
+        }
+
+        /* ---------- basit AI (oyuncuya koş-patla) ---------- */
         float dx = player.getX()-x, dy = player.getY()-baseY;
-        float dist = (float)Math.sqrt(dx*dx+dy*dy);
-
+        float dist=(float)Math.sqrt(dx*dx+dy*dy);
         facingLeft = dx<0;
-        if(dist>ATTACK_RANGE){
-            float nx=dx/dist, ny=dy/dist;
-            x     += nx*SPEED*dt;
-            baseY += ny*SPEED*dt;
-        } else {
-            state = State.FUSE; fuseT = 0;
+
+        if(dist>1.3f){
+            x+=dx/dist*dt*1.7f; baseY+=dy/dist*dt*1.7f;
+        }else{ exploding=true; boomT=0;
+            if(dx*dx+dy*dy<1.5f*1.5f){
+                float ang=MathUtils.atan2(dy,dx)*MathUtils.radiansToDegrees;
+                player.takeDamage(35f,4f,ang);
+            }
         }
-        hopPhase += dt*2f;
-    }
-    private void updateFuse(float dt){
-        fuseT += dt;
-        if(fuseAnim.isAnimationFinished(fuseT)){
-            startExplosion();
-        }
-    }
-    private void startExplosion(){
-        state = State.EXPLODING; boomT = 0;
-        float dx = player.getX()-x, dy = player.getY()-baseY;
-        if(dx*dx+dy*dy < DAMAGE_R*DAMAGE_R){
-            float ang = MathUtils.atan2(dy,dx)*MathUtils.radiansToDegrees;
-            player.takeDamage(DAMAGE_AMT,4f,ang);
-        }
+
+        t+=dt; hop = Math.abs(MathUtils.sin(t*3f))*0.35f;
     }
 
-    /* ───── RENDER ───── */
     public void render(SpriteBatch b){
-        if(state==State.RUNNING){
-            TextureRegion f=(facingLeft?runL:runR).getKeyFrame(hopPhase,true);
-            float hop=Math.abs(MathUtils.sin(hopPhase))*0.35f;
-            draw(b,f,SCALE_BODY,hop);
-        }else if(state==State.FUSE){
-            draw(b, fuseAnim.getKeyFrame(fuseT), SCALE_BODY,0);
-        }else{ // EXPLODING
-            draw(b, explodeAnim.getKeyFrame(boomT), SCALE_BOOM,0);
+        if(exploding){
+            TextureRegion f=explodeA.getKeyFrame(boomT);
+            draw(b,f,1.5f);
+            return;
         }
+        TextureRegion f=(facingLeft?runL:runR).getKeyFrame(t,true);
+        draw(b,f,1f, hop);
     }
 
-    private void draw(SpriteBatch b,TextureRegion tex,float scl,float yOff){
-        float w=tex.getRegionWidth()*scl, h=tex.getRegionHeight()*scl;
-        b.draw(tex, x-w/2f, baseY+yOff-h/2f, w,h);
+    private void draw(SpriteBatch b,TextureRegion f,float scl){ draw(b,f,scl,0); }
+    private void draw(SpriteBatch b,TextureRegion f,float scl,float yOff){
+        float w=f.getRegionWidth()*scl*SCALE, h=f.getRegionHeight()*scl*SCALE;
+        b.draw(f,x-w/2f,baseY+yOff-h/2f,w,h);
     }
 
-    /* — remove flag — */
-    public boolean isFinished(){
-        return state==State.EXPLODING && explodeAnim.isAnimationFinished(boomT);
-    }
+    public boolean isFinished(){ return exploding && explodeA.isAnimationFinished(boomT); }
 }

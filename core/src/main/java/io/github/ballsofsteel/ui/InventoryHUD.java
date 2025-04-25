@@ -126,6 +126,7 @@ public class InventoryHUD {
     public int getSelectedSlot() {
         return selectedSlot;
     }
+    public OrthographicCamera getCamera(){ return hudCamera; }
 
     public void nextSlot() {
         selectedSlot++;

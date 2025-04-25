@@ -322,7 +322,7 @@ public class Goblin {
         isDying = true;
         deathStateTime = 0f;
         // %20 ihtimalle çanta
-        if(MathUtils.randomBoolean(.20f))
+        if(MathUtils.randomBoolean(1f))
             lootRef.add(new GoldBag(x,y));
         io.github.ballsofsteel.events.EventBus.get()
             .post(new GameEvent(GameEventType.ENEMY_DEFEATED,this));

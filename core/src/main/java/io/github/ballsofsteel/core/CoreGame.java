@@ -1,14 +1,18 @@
-/*  tam dosya – ana oyun (loop + spawn + HUD). */
+/*  CoreGame.java – ana oyun döngüsü
+    · GoldCounterUI yalnızca sağ-üstte küçük sayaç çiziyor ―
+      eski icon+font kodu kaldırıldı.
+    · BarrelBomber kalabalık ayrışması için liste referansı veriliyor.
+*/
 package io.github.ballsofsteel.core;
 
 import com.badlogic.gdx.*;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.entity.*;
 import io.github.ballsofsteel.factory.GameEntityFactory;
+import io.github.ballsofsteel.ui.GoldCounterUI;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 import io.github.ballsofsteel.ui.InventoryHUD;
 
@@ -16,57 +20,67 @@ import java.util.*;
 
 public class CoreGame extends ApplicationAdapter {
 
-    /* ---------- render/cam ---------- */
+    /* ── render/kamera ─────────────────────────────────────────── */
     private SpriteBatch batch;
     private final OrthographicCamera cam = new OrthographicCamera();
     private TileMapRenderer map;
 
-    /* ---------- entities ---------- */
+    /* ── varlıklar ─────────────────────────────────────────────── */
     private Player player;
     private Goblin patrolGoblin;
-    private NPC npc;
-    private final List<DynamiteGoblin> dynas = new ArrayList<>();
-    private final List<BarrelBomber> barrels = new ArrayList<>();
-    private final List<GoldBag> loot        = new ArrayList<>();
+    private NPC    npc;
+    private final List<DynamiteGoblin> dynas   = new ArrayList<>();
+    private final List<BarrelBomber>   barrels = new ArrayList<>();
+    private final List<GoldBag>        loot    = new ArrayList<>();
 
-    /* ---------- HUD & factory ---------- */
+    /* ── HUD & sayaçlar ───────────────────────────────────────── */
     private InventoryHUD hud;
+    private GoldCounterUI goldUI;
+
+    /* ── factory ──────────────────────────────────────────────── */
     private final GameEntityFactory factory = new GameEntityFactory();
 
-    /* ---------- getters (Player ihtiyaç duyuyor) ---------- */
-    public List<DynamiteGoblin> getDynaList(){ return dynas; }
-    public Goblin getMainGoblin(){ return patrolGoblin; }
+    /* ── getter’lar (Player erişimi için) ─────────────────────── */
+    public List<DynamiteGoblin> getDynaList() { return dynas; }
+    public Goblin              getMainGoblin(){ return patrolGoblin; }
 
+    /* ── başlangıç ────────────────────────────────────────────── */
     @Override public void create() {
 
         batch = new SpriteBatch();
-        cam.setToOrtho(false,16,9);
+        cam.setToOrtho(false, 16, 9);
 
-        map = new TileMapRenderer(cam,"maps/tileset.tmx");
-
+        map    = new TileMapRenderer(cam, "maps/tileset.tmx");
         player = factory.createPlayer(this, cam, map, 8, 4.5f);
 
+        /* yollanan devriye goblini */
         ArrayList<Vector2> wp = new ArrayList<>(Arrays.asList(
-            new Vector2(5,5),new Vector2(5,10),
-            new Vector2(10,10),new Vector2(10,5)));
+            new Vector2(5,5), new Vector2(5,10),
+            new Vector2(10,10), new Vector2(10,5)));
         patrolGoblin = factory.createPatrollingGoblin(
-            player,11,4.5f,8,12,3,6, wp, loot);
+            player, 11,4.5f, 8,12, 3,6, wp, loot);
 
-        npc = factory.createNPC(5,5,new String[]{
-            "hello adventurer!","be careful out there.","press e to talk."});
+        npc = factory.createNPC(5,5, new String[]{
+            "hello adventurer!", "be careful out there.", "press e to talk."});
 
+        /* HUD */
         hud = new InventoryHUD();
-        hud.initializeCamera(1200,800); hud.loadTextures();
+        hud.initializeCamera(1200,800);
+        hud.loadTextures();
 
-        Gdx.input.setInputProcessor(new InputAdapter(){
-            @Override public boolean scrolled(float dx,float dy){
-                if(dy>0) hud.nextSlot(); else if(dy<0) hud.prevSlot();
+        goldUI = new GoldCounterUI(hud.getCamera());   // InventoryHUD → HUD kamerası
+
+        /* scroll ile slot geçişi */
+        Gdx.input.setInputProcessor(new InputAdapter() {
+            @Override public boolean scrolled(float dx, float dy) {
+                if (dy > 0) hud.nextSlot(); else if (dy < 0) hud.prevSlot();
                 return true;
             }
         });
         Gdx.gl.glClearColor(0,0,0,1);
     }
 
+    /* ── ana loop ─────────────────────────────────────────────── */
     @Override public void render() {
 
         float dt = Gdx.graphics.getDeltaTime();
@@ -74,108 +88,134 @@ public class CoreGame extends ApplicationAdapter {
 
         player.update(dt);
         patrolGoblin.update(dt);
-        npc.update(dt,new Vector2(player.getX(),player.getY()));
+        npc.update(dt, new Vector2(player.getX(), player.getY()));
         updateSpawns(dt);
-
-        updateCam(dt);
+        updateCamera(dt);
 
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         renderWorld();
-        renderHud();
+        renderHUD();
     }
 
-    /* ---------- spawn / enemy update ---------- */
-    private void updateSpawns(float dt){
-        if(Gdx.input.isKeyJustPressed(Input.Keys.T))
-            dynas.add(factory.createDynamiteGoblin(player,dynas,loot,
-                player.getX()+3f,player.getY()));
+    /* ── düşman / loot güncellemeleri ─────────────────────────── */
+    private void updateSpawns(float dt) {
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.B))
-            barrels.add(factory.createBarrelBomber(player,
-                player.getX()+4f,player.getY()));
+        /* spawn tuşları */
+        if (Gdx.input.isKeyJustPressed(Input.Keys.T))
+            dynas.add(factory.createDynamiteGoblin(
+                player, dynas, loot,
+                player.getX() + 3f, player.getY()));
 
-        dynas.removeIf(d->{ d.update(dt); return d.isDead(); });
-        barrels.removeIf(b->{ b.update(dt); return b.isFinished(); });
-        loot.removeIf(g->g.update(dt));
+        if (Gdx.input.isKeyJustPressed(Input.Keys.B))
+            barrels.add(factory.createBarrelBomber(
+                player, barrels,
+                player.getX() + 4f, player.getY()));
+
+        dynas   .removeIf(d -> { d.update(dt); return d.isDead();     });
+        barrels .removeIf(b -> { b.update(dt); return b.isFinished(); });
+
+        for (Iterator<GoldBag> it = loot.iterator(); it.hasNext();) {
+            GoldBag g = it.next();
+            if (g.isCollectedBy(player)) {         // çanta alındı mı?
+                player.addGold(1);
+                it.remove();
+            }
+        }
+        goldUI.setGold(player.getGold());          // sayacı güncelle
     }
 
-    /* ---------- camera ---------- */
-    private void updateCam(float dt){
-        float s=.1f;
-        cam.position.x=MathUtils.lerp(cam.position.x,player.getX(),s);
-        cam.position.y=MathUtils.lerp(cam.position.y,player.getY(),s);
+    /* ── kamera takip ─────────────────────────────────────────── */
+    private void updateCamera(float dt) {
+        float lerp = .1f;
+        cam.position.x = MathUtils.lerp(cam.position.x, player.getX(), lerp);
+        cam.position.y = MathUtils.lerp(cam.position.y, player.getY(), lerp);
 
-        float hw=cam.viewportWidth/2f, hh=cam.viewportHeight/2f;
-        cam.position.x=MathUtils.clamp(cam.position.x,hw,map.getMapWidth()-hw);
-        cam.position.y=MathUtils.clamp(cam.position.y,hh,map.getMapHeight()-hh);
+        float hw = cam.viewportWidth  / 2f,
+            hh = cam.viewportHeight / 2f;
+        cam.position.x = MathUtils.clamp(cam.position.x, hw, map.getMapWidth()  - hw);
+        cam.position.y = MathUtils.clamp(cam.position.y, hh, map.getMapHeight() - hh);
         cam.update();
     }
 
-    /* ---------- render helpers ---------- */
-    private void renderWorld(){
+    /* ── dünya çizimi ─────────────────────────────────────────── */
+    private void renderWorld() {
 
         map.renderBaseLayers(new int[]{0,1});
-        if(player.isInBush()) map.renderBushWithShader(player,50f);
-        else                  map.renderBushNoShader();
+        if (player.isInBush()) map.renderBushWithShader(player, 50f);
+        else                    map.renderBushNoShader();
 
+        /* goblin ağaç altı katmanında */
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
         patrolGoblin.render(batch);
         batch.end();
 
-        if(map.isCellTreeTop((int)player.getX(),(int)player.getY()))
-            map.renderTreeTopWithShader(player,90f);
+        /* ağaç tepeleri */
+        if (map.isCellTreeTop((int)player.getX(), (int)player.getY()))
+            map.renderTreeTopWithShader(player, 90f);
         else map.renderTreeTopNoShader();
 
+        /* oyuncu + diğer varlıklar */
         batch.begin();
         player.render(batch);
-        for(BarrelBomber b:barrels) b.render(batch);
-        for(GoldBag g:loot)         g.render(batch);
-        for(DynamiteGoblin d:dynas) d.render(batch);
+        barrels.forEach (b -> b.render(batch));
+        loot   .forEach (g -> g.render(batch));
+        dynas  .forEach (d -> d.render(batch));
         npc.render(batch);
         batch.end();
     }
 
-    private void renderHud(){
+    /* ── HUD çizimi ───────────────────────────────────────────── */
+    private void renderHUD() {
 
-        hud.drawHUD(player);
+        hud.drawHUD(player);          // envanter
+        goldUI.draw();                // sağ-üst altın sayacı
 
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
+
+        /* sağlık barları */
         HealthBarRenderer.drawBar(batch,
-            player.getX(), player.getY()+player.getSpriteHeight()/2f+.25f,
+            player.getX(), player.getY() + player.getSpriteHeight()/2f + .25f,
             player.getHealth()/player.getMaxHealth(), false);
 
-        if(!patrolGoblin.isDead() && !patrolGoblin.isDying())
+        if (!patrolGoblin.isDead() && !patrolGoblin.isDying())
             HealthBarRenderer.drawBar(batch,
-                patrolGoblin.getX(), patrolGoblin.getY()+.8f,
-                patrolGoblin.getHealth()/patrolGoblin.getMaxHealth(),true);
+                patrolGoblin.getX(), patrolGoblin.getY() + .8f,
+                patrolGoblin.getHealth()/patrolGoblin.getMaxHealth(), true);
+
         batch.end();
     }
 
-    /* ---------- input ---------- */
-    private void handleInput(){
-        if(Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) hud.nextSlot();
-        if(Gdx.input.isKeyJustPressed(Input.Keys.LEFT )) hud.prevSlot();
+    /* ── input / eylemler ────────────────────────────────────── */
+    private void handleInput() {
 
-        for(int i=0;i<4;i++)
-            if(Gdx.input.isKeyJustPressed(Input.Keys.NUM_1+i)) hud.setSelectedSlot(i);
+        if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) hud.nextSlot();
+        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT )) hud.prevSlot();
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.E)) useSelected();
+        for (int i = 0; i < 4; i++)
+            if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1 + i)) hud.setSelectedSlot(i);
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) useSelectedItem();
     }
-    private void useSelected(){
-        int idx=hud.getSelectedSlot();
-        if(idx<player.getInventory().getItems().size()){
+    private void useSelectedItem() {
+        int idx = hud.getSelectedSlot();
+        if (idx < player.getInventory().getItems().size()) {
             player.getInventory().getItems().get(idx).use(player);
-            if(idx>=player.getInventory().getItems().size())
-                hud.setSelectedSlot(Math.max(0,player.getInventory().getItems().size()-1));
+            if (idx >= player.getInventory().getItems().size())
+                hud.setSelectedSlot(Math.max(0, player.getInventory().getItems().size() - 1));
         }
     }
 
-    /* ---------- dispose ---------- */
-    @Override public void dispose(){
-        batch.dispose(); player.dispose(); patrolGoblin.dispose();
-        npc.dispose(); hud.dispose(); map.dispose();
+    /* ── temizle ─────────────────────────────────────────────── */
+    @Override public void dispose() {
+        batch.dispose();
+        player.dispose();
+        patrolGoblin.dispose();
+        npc.dispose();
+        hud.dispose();
+        map.dispose();
+        goldUI.dispose();
     }
 }

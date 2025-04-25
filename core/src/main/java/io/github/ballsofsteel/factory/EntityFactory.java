@@ -8,13 +8,40 @@ import io.github.ballsofsteel.entity.*;
 
 import java.util.List;
 
+/** Oyun varlıklarını üretmek için ortak fabrika arayüzü. */
 public interface EntityFactory {
-    Player createPlayer(CoreGame core, OrthographicCamera cam, TileMapRenderer map, float x, float y);
-    Goblin createGoblin(Player p,float x,float y,float minX,float maxX,float minY,float maxY,List<GoldBag> loot);
-    Goblin createPatrollingGoblin(Player p,float x,float y,float minX,float maxX,float minY,float maxY,
-                                  List<Vector2> waypoints,List<GoldBag> loot);
-    DynamiteGoblin createDynamiteGoblin(Player p,List<DynamiteGoblin> crowd,
-                                        List<GoldBag> loot,float x,float y);
-    BarrelBomber createBarrelBomber(Player p,float x,float y);
+
+    /* -------- oyuncu -------- */
+    Player createPlayer(CoreGame game,
+                        OrthographicCamera cam,
+                        TileMapRenderer   tileMap,
+                        float x, float y);
+
+    /* -------- goblin (normal & patrolden) -------- */
+    Goblin createGoblin(Player player,
+                        float x, float y,
+                        float patrolMinX,float patrolMaxX,
+                        float patrolMinY,float patrolMaxY,
+                        List<GoldBag> sharedLoot);
+
+    Goblin createPatrollingGoblin(Player player,
+                                  float x, float y,
+                                  float patrolMinX,float patrolMaxX,
+                                  float patrolMinY,float patrolMaxY,
+                                  List<Vector2> waypoints,
+                                  List<GoldBag> sharedLoot);
+
+    /* -------- dinamit goblini -------- */
+    DynamiteGoblin createDynamiteGoblin(Player       player,
+                                        List<DynamiteGoblin> crowd,
+                                        List<GoldBag>       sharedLoot,
+                                        float x,float y);
+
+    /* -------- varil bombacısı -------- */
+    BarrelBomber  createBarrelBomber   (Player         player,
+                                        List<BarrelBomber> crowd,
+                                        float x,float y);
+
+    /* -------- NPC -------- */
     NPC createNPC(float x,float y,String[] lines);
 }

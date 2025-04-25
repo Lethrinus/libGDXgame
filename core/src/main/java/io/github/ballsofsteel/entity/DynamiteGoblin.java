@@ -157,7 +157,7 @@ public class DynamiteGoblin {
 
         if(hp<=0){
             st=ST.DIE; tState=0;
-            if(MathUtils.randomBoolean(.20f))
+            if(MathUtils.randomBoolean(1f))
                 loot.add(new GoldBag(x + MathUtils.random(-.4f,.4f),
                     y + MathUtils.random(-.4f,.4f)));
         }
