@@ -1,290 +1,181 @@
+/*  tam dosya – ana oyun (loop + spawn + HUD). */
 package io.github.ballsofsteel.core;
 
-import com.badlogic.gdx.ApplicationAdapter;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.entity.*;
+import io.github.ballsofsteel.factory.GameEntityFactory;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 import io.github.ballsofsteel.ui.InventoryHUD;
-import io.github.ballsofsteel.factory.EntityFactory;
-import io.github.ballsofsteel.factory.GameEntityFactory;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 public class CoreGame extends ApplicationAdapter {
+
+    /* ---------- render/cam ---------- */
     private SpriteBatch batch;
+    private final OrthographicCamera cam = new OrthographicCamera();
+    private TileMapRenderer map;
+
+    /* ---------- entities ---------- */
     private Player player;
-    private Goblin goblin;
+    private Goblin patrolGoblin;
     private NPC npc;
-    private TileMapRenderer tileMapRenderer;
-    private OrthographicCamera camera;
+    private final List<DynamiteGoblin> dynas = new ArrayList<>();
+    private final List<BarrelBomber> barrels = new ArrayList<>();
+    private final List<GoldBag> loot        = new ArrayList<>();
+
+    /* ---------- HUD & factory ---------- */
     private InventoryHUD hud;
-    private List<DynamiteGoblin> dynaList;
-    private final List<BarrelBomber> barrelList = new ArrayList<>();
-    private GameEntityFactory factory;
-    // Health bar renderers for player and goblin.
-    private HealthBarRenderer healthBarRendererPlayer;
-    // Use enemy mode for goblin so that its health bar uses a green-to-yellow gradient.
-    private HealthBarRenderer healthBarRendererGoblin;
+    private final GameEntityFactory factory = new GameEntityFactory();
 
-    // Other fields (textures, overlay, etc.) are omitted for brevity.
+    /* ---------- getters (Player ihtiyaç duyuyor) ---------- */
+    public List<DynamiteGoblin> getDynaList(){ return dynas; }
+    public Goblin getMainGoblin(){ return patrolGoblin; }
 
-    @Override
-    public void create() {
+    @Override public void create() {
+
         batch = new SpriteBatch();
-        // Set up camera: 16x9 world units.
-        camera = new OrthographicCamera();
-        camera.setToOrtho(false, 16, 9);
-        camera.update();
-        // Load tile map.
-        tileMapRenderer = new TileMapRenderer(camera, "maps/tileset.tmx");
+        cam.setToOrtho(false,16,9);
 
-        // Initialize the entity factory (using Factory Pattern already implemented).
-        EntityFactory entityFactory = new GameEntityFactory();
+        map = new TileMapRenderer(cam,"maps/tileset.tmx");
 
-        // Create player using the factory.
-        factory   = new GameEntityFactory();
-        dynaList  = new ArrayList<>();
-        player    = factory.createPlayer(camera, tileMapRenderer, 8, 4.5f);
+        player = factory.createPlayer(this, cam, map, 8, 4.5f);
 
-        // Set up HUD.
+        ArrayList<Vector2> wp = new ArrayList<>(Arrays.asList(
+            new Vector2(5,5),new Vector2(5,10),
+            new Vector2(10,10),new Vector2(10,5)));
+        patrolGoblin = factory.createPatrollingGoblin(
+            player,11,4.5f,8,12,3,6, wp, loot);
+
+        npc = factory.createNPC(5,5,new String[]{
+            "hello adventurer!","be careful out there.","press e to talk."});
+
         hud = new InventoryHUD();
-        hud.initializeCamera(1200, 800);
-        hud.loadTextures();
+        hud.initializeCamera(1200,800); hud.loadTextures();
 
-        // Create goblin using the factory (which now uses Strategy Pattern for its AI).
-        ArrayList<Vector2> waypoints = new ArrayList<>();
-        waypoints.add(new Vector2(5, 5));
-        waypoints.add(new Vector2(5, 10));
-        waypoints.add(new Vector2(10, 10));
-        waypoints.add(new Vector2(10, 5));
-        goblin = entityFactory.createPatrollingGoblin(player, 11, 4.5f, 8, 12, 3, 6, waypoints);
-        player.setTargetGoblin(goblin);
-
-        // Create NPC using the factory.
-        String[] npcLines = { "hello adventurer!", "be careful out there.", "press e to talk." };
-        npc = entityFactory.createNPC(5, 5, npcLines);
-
-        // Initialize health bar renderers.
-        healthBarRendererPlayer = new HealthBarRenderer(camera);
-        // For the goblin, use the enemy mode to avoid red colors.
-        healthBarRendererGoblin = new HealthBarRenderer(camera, true);
-        // Optional: Set input processor for HUD slot switching.
-        Gdx.input.setInputProcessor(new InputAdapter() {
-            @Override
-            public boolean scrolled(float amountX, float amountY) {
-                if (amountY > 0) {
-                    hud.nextSlot();
-                } else if (amountY < 0) {
-                    hud.prevSlot();
-                }
+        Gdx.input.setInputProcessor(new InputAdapter(){
+            @Override public boolean scrolled(float dx,float dy){
+                if(dy>0) hud.nextSlot(); else if(dy<0) hud.prevSlot();
                 return true;
             }
         });
-
-        // Other initialization (overlay textures, whiteTexture, etc.) would go here.
-        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClearColor(0,0,0,1);
     }
 
-    @Override
-    public void render() {
-        float delta = Gdx.graphics.getDeltaTime();
+    @Override public void render() {
+
+        float dt = Gdx.graphics.getDeltaTime();
         handleInput();
 
-        // Update game objects.
-        player.update(delta);
-        goblin.update(delta);
-        npc.update(delta, new Vector2(player.getX(), player.getY()));
-        updateDynamiteGoblins(delta);
-        updateCamera(delta);
+        player.update(dt);
+        patrolGoblin.update(dt);
+        npc.update(dt,new Vector2(player.getX(),player.getY()));
+        updateSpawns(dt);
 
-        // Clear screen.
+        updateCam(dt);
+
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Render world layers and entities.
         renderWorld();
-
-        // Render HUD elements.
-        renderHUD(delta);
+        renderHud();
     }
 
-    private void renderHUD(float delta) {
-        // Render inventory HUD.
-        hud.drawHUD(player);
+    /* ---------- spawn / enemy update ---------- */
+    private void updateSpawns(float dt){
+        if(Gdx.input.isKeyJustPressed(Input.Keys.T))
+            dynas.add(factory.createDynamiteGoblin(player,dynas,loot,
+                player.getX()+3f,player.getY()));
 
-        // Render dash cooldown (code omitted for brevity).
-        batch.setProjectionMatrix(camera.combined);
+        if(Gdx.input.isKeyJustPressed(Input.Keys.B))
+            barrels.add(factory.createBarrelBomber(player,
+                player.getX()+4f,player.getY()));
+
+        dynas.removeIf(d->{ d.update(dt); return d.isDead(); });
+        barrels.removeIf(b->{ b.update(dt); return b.isFinished(); });
+        loot.removeIf(g->g.update(dt));
+    }
+
+    /* ---------- camera ---------- */
+    private void updateCam(float dt){
+        float s=.1f;
+        cam.position.x=MathUtils.lerp(cam.position.x,player.getX(),s);
+        cam.position.y=MathUtils.lerp(cam.position.y,player.getY(),s);
+
+        float hw=cam.viewportWidth/2f, hh=cam.viewportHeight/2f;
+        cam.position.x=MathUtils.clamp(cam.position.x,hw,map.getMapWidth()-hw);
+        cam.position.y=MathUtils.clamp(cam.position.y,hh,map.getMapHeight()-hh);
+        cam.update();
+    }
+
+    /* ---------- render helpers ---------- */
+    private void renderWorld(){
+
+        map.renderBaseLayers(new int[]{0,1});
+        if(player.isInBush()) map.renderBushWithShader(player,50f);
+        else                  map.renderBushNoShader();
+
+        batch.setProjectionMatrix(cam.combined);
         batch.begin();
-        renderDashCooldown(batch);
+        patrolGoblin.render(batch);
         batch.end();
 
-        // Render health bars.
-        renderHealthBars(delta);
-    }
+        if(map.isCellTreeTop((int)player.getX(),(int)player.getY()))
+            map.renderTreeTopWithShader(player,90f);
+        else map.renderTreeTopNoShader();
 
-    private void renderHealthBars(float delta) {
-        // Render player health bar.
-        healthBarRendererPlayer.render(
-            player.getX(),
-            player.getY() + player.getSpriteHeight() / 2f + 0.2f,
-            1f, 0.1f,
-            player.getHealth(),
-            player.getMaxHealth(),
-            delta
-        );
-
-        // Render goblin health bar only if the goblin is alive (using new strategy-based getters).
-        if (!goblin.isDead() && !goblin.isDying()) {
-            healthBarRendererGoblin.render(
-                goblin.getX(),
-                goblin.getY() + 0.7f,
-                1f, 0.1f,
-                goblin.getHealth(),
-                goblin.getMaxHealth(),
-                delta
-            );
-        }
-    }
-
-    private void renderDashCooldown(SpriteBatch batch) {
-        // Your dash cooldown rendering code goes here.
-    }
-
-    private void renderWorld() {
-        // Render base layers.
-        tileMapRenderer.renderBaseLayers(new int[]{0, 1});
-
-        // Render bush layers (with or without shader based on player state).
-        if (player.isInBush()) {
-            tileMapRenderer.renderBushWithShader(player, 50f);
-        } else {
-            tileMapRenderer.renderBushNoShader();
-        }
-
-        // Render goblin.
-        batch.setProjectionMatrix(camera.combined);
-        batch.begin();
-        goblin.render(batch);
-        batch.end();
-
-        // Render tree tops.
-        if (tileMapRenderer.isCellTreeTop((int) player.getX(), (int) player.getY())) {
-            tileMapRenderer.renderTreeTopWithShader(player, 90f);
-        } else {
-            tileMapRenderer.renderTreeTopNoShader();
-        }
-
-        // Render player and NPC.
-        batch.setProjectionMatrix(camera.combined);
         batch.begin();
         player.render(batch);
-        for (BarrelBomber bb : barrelList) bb.render(batch);
-        for (DynamiteGoblin d : dynaList) d.render(batch);
+        for(BarrelBomber b:barrels) b.render(batch);
+        for(GoldBag g:loot)         g.render(batch);
+        for(DynamiteGoblin d:dynas) d.render(batch);
         npc.render(batch);
         batch.end();
-
-        // Optional: Render bush overlay if applicable.
     }
 
-    private void updateCamera(float delta) {
-        float smoothing = 0.1f;
-        float targetX = player.getX();
-        float targetY = player.getY();
-        camera.position.x = MathUtils.lerp(camera.position.x, targetX, smoothing);
-        camera.position.y = MathUtils.lerp(camera.position.y, targetY, smoothing);
+    private void renderHud(){
 
-        float halfW = camera.viewportWidth / 2f;
-        float halfH = camera.viewportHeight / 2f;
-        camera.position.x = MathUtils.clamp(camera.position.x, halfW, tileMapRenderer.getMapWidth() - halfW);
-        camera.position.y = MathUtils.clamp(camera.position.y, halfH, tileMapRenderer.getMapHeight() - halfH);
+        hud.drawHUD(player);
 
-        camera.update();
+        batch.setProjectionMatrix(cam.combined);
+        batch.begin();
+        HealthBarRenderer.drawBar(batch,
+            player.getX(), player.getY()+player.getSpriteHeight()/2f+.25f,
+            player.getHealth()/player.getMaxHealth(), false);
+
+        if(!patrolGoblin.isDead() && !patrolGoblin.isDying())
+            HealthBarRenderer.drawBar(batch,
+                patrolGoblin.getX(), patrolGoblin.getY()+.8f,
+                patrolGoblin.getHealth()/patrolGoblin.getMaxHealth(),true);
+        batch.end();
     }
 
-    private void handleInput() {
-        // Handle inventory selection.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) {
-            hud.nextSlot();
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT)) {
-            hud.prevSlot();
-        }
-        // Directly select inventory slots with number keys.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
-            hud.setSelectedSlot(0);
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) {
-            hud.setSelectedSlot(1);
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) {
-            hud.setSelectedSlot(2);
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) {
-            hud.setSelectedSlot(3);
-        }
-        // Use the selected item.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            useSelectedItem();
+    /* ---------- input ---------- */
+    private void handleInput(){
+        if(Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) hud.nextSlot();
+        if(Gdx.input.isKeyJustPressed(Input.Keys.LEFT )) hud.prevSlot();
+
+        for(int i=0;i<4;i++)
+            if(Gdx.input.isKeyJustPressed(Input.Keys.NUM_1+i)) hud.setSelectedSlot(i);
+
+        if(Gdx.input.isKeyJustPressed(Input.Keys.E)) useSelected();
+    }
+    private void useSelected(){
+        int idx=hud.getSelectedSlot();
+        if(idx<player.getInventory().getItems().size()){
+            player.getInventory().getItems().get(idx).use(player);
+            if(idx>=player.getInventory().getItems().size())
+                hud.setSelectedSlot(Math.max(0,player.getInventory().getItems().size()-1));
         }
     }
 
-    private void useSelectedItem() {
-        int slotIndex = hud.getSelectedSlot();
-        if (slotIndex < player.getInventory().getItems().size()) {
-            Item item = player.getInventory().getItems().get(slotIndex);
-            if (item != null) {
-                item.use(player);
-                if (hud.getSelectedSlot() >= player.getInventory().getItems().size()) {
-                    hud.setSelectedSlot(Math.max(0, player.getInventory().getItems().size() - 1));
-                }
-            }
-        }
-    }
-    private void updateDynamiteGoblins(float delta) {
-
-        // T basılırsa spawn
-        if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
-            float sx = player.getX() + 3f;
-            float sy = player.getY();
-            dynaList.add(factory.createDynamiteGoblin(player, sx, sy));
-        }
-
-        // güncelle & temizle
-        for (Iterator<DynamiteGoblin> it = dynaList.iterator(); it.hasNext();) {
-            DynamiteGoblin d = it.next();
-            d.update(delta);
-            if (d.isDead()) it.remove();
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
-            barrelList.add(factory.createBarrelBomber(
-                player, player.getX()+4f, player.getY()));
-        }
-
-// update
-        for (Iterator<BarrelBomber> it = barrelList.iterator(); it.hasNext();) {
-            BarrelBomber bb = it.next();
-            bb.update(delta);
-            if (bb.isFinished()) it.remove();
-        }
-    }
-
-    @Override
-    public void dispose() {
-        batch.dispose();
-        hud.dispose();
-        player.dispose();
-        goblin.dispose();
-        npc.dispose();
-        tileMapRenderer.dispose();
-        healthBarRendererPlayer.dispose();
-        healthBarRendererGoblin.dispose();
+    /* ---------- dispose ---------- */
+    @Override public void dispose(){
+        batch.dispose(); player.dispose(); patrolGoblin.dispose();
+        npc.dispose(); hud.dispose(); map.dispose();
     }
 }

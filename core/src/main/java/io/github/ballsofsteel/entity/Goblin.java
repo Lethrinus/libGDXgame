@@ -87,7 +87,7 @@ public class Goblin {
     // Death disappearance delay.
     private float deathWaitTime = 0f;
     private float deathDisappearDelay = 5f;
-
+    private final List<GoldBag> lootRef;
     // Strategy Pattern for AI behavior.
     private GoblinState currentState;
 
@@ -105,8 +105,10 @@ public class Goblin {
     public Goblin(Player player,
                   float startX, float startY,
                   float patrolMinX, float patrolMaxX,
-                  float patrolMinY, float patrolMaxY) {
+                  float patrolMinY, float patrolMaxY,List<GoldBag> loot) {
+
         this.player = player;
+        this.lootRef = loot;
         this.x = startX;
         this.y = startY;
         this.patrolMinX = patrolMinX;
@@ -253,10 +255,9 @@ public class Goblin {
         }
 
         if (health <= 0 && !isDying) {
-            isDying = true; deathStateTime = 0f;
-            EventBus.get().post(
-                new GameEvent(GameEventType.ENEMY_DEFEATED, this));
+            die();
             return;
+
         }
 
         float dxP = player.getX() - x;
@@ -317,7 +318,15 @@ public class Goblin {
             batch.setColor(1, 1, 1, 1);
         }
     }
-
+    private void die(){
+        isDying = true;
+        deathStateTime = 0f;
+        // %20 ihtimalle çanta
+        if(MathUtils.randomBoolean(.20f))
+            lootRef.add(new GoldBag(x,y));
+        io.github.ballsofsteel.events.EventBus.get()
+            .post(new GameEvent(GameEventType.ENEMY_DEFEATED,this));
+    }
     /**
      * Disposes of goblin resources.
      */

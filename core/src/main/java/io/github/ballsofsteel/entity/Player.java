@@ -14,7 +14,7 @@ import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.ui.Inventory;
 import io.github.ballsofsteel.core.TileMapRenderer;
-
+import io.github.ballsofsteel.core.CoreGame;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +24,7 @@ import java.util.List;
 public class Player {
     private float x, y;
     private float speed = 3.5f;
-
+    private CoreGame core;
     // Timers for movement and attack animations.
     private float movementStateTime = 0f;
     private float attackStateTime = 0f;
@@ -109,8 +109,9 @@ public class Player {
 
     private Inventory inventory;
 
-    public Player(OrthographicCamera camera, TileMapRenderer tileMapRenderer) {
+    public Player(OrthographicCamera camera, TileMapRenderer tileMapRenderer, CoreGame core) {
         this.camera = camera;
+        this.core = core;
         this.tileMapRenderer = tileMapRenderer;
         this.health = 100f;
         this.maxHealth = 100f;
@@ -330,22 +331,32 @@ public class Player {
         // Attack logic.
         if (isAttacking) {
             attackStateTime += delta;
+
             if (!attackExecuted && attackStateTime >= attackHitTime) {
-                if (targetGoblin != null) {
-                    float dxg = targetGoblin.getX() - x;
-                    float dyg = targetGoblin.getY() - y;
-                    float dist = (float) Math.sqrt(dxg * dxg + dyg * dyg);
-                    if (dist <= attackRange) {
-                        float angle = MathUtils.atan2(dyg, dxg) * MathUtils.radiansToDegrees;
-                        targetGoblin.takeDamage(attackDamage, attackKnockbackForce, angle);
+                /* -- Dinamitçiler */
+                for (DynamiteGoblin dg : core.getDynaList()) {
+                    float ddx = dg.getX() - x, ddy = dg.getY() - y;      // ← isimler değiştirildi
+                    if (ddx*ddx + ddy*ddy <= attackRange*attackRange) {
+                        float ang = MathUtils.atan2(ddy, ddx) * MathUtils.radiansToDegrees;
+                        dg.takeDamage(attackDamage, attackKnockbackForce, ang);
+                        attackExecuted = true;
+                    }
+                }
+
+                /* -- Ana Goblin */
+                Goblin g = core.getMainGoblin();
+                if (!attackExecuted && g != null && !g.isDead()) {
+                    float ddx = g.getX() - x, ddy = g.getY() - y;        // ← yine isimler değişti
+                    if (ddx*ddx + ddy*ddy <= attackRange*attackRange) {
+                        float ang = MathUtils.atan2(ddy, ddx) * MathUtils.radiansToDegrees;
+                        g.takeDamage(attackDamage, attackKnockbackForce, ang);
                         attackExecuted = true;
                     }
                 }
             }
-            if (attackStateTime >= attackDuration) {
-                isAttacking = false;
-            }
-        } else {
+            if (attackStateTime >= attackDuration) isAttacking = false;
+        }
+         else {
             // Store old position.
             float oldX = x, oldY = y;
             float moveSpeed = isDashing ? dashSpeed : speed;
