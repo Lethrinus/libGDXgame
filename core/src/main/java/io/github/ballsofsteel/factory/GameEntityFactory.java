@@ -35,11 +35,12 @@ public class GameEntityFactory implements EntityFactory {
 
     @Override
     public Goblin createGoblin(Player        player,
+                               CoreGame game,
                                List<Goblin>  crowd,
                                float         x, float y,
                                List<GoldBag> loot) {
 
-        return new Goblin(player, crowd, x, y, loot);
+        return new Goblin(player,game, crowd, x, y, loot);
     }
 
     @Override

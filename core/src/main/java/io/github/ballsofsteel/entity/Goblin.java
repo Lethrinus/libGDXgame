@@ -5,7 +5,9 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
+import io.github.ballsofsteel.core.CoreGame;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 
 import java.util.List;
@@ -31,7 +33,7 @@ public class Goblin {
     private final Player player;
     private final List<Goblin> crowd;
     private final List<GoldBag> loot;
-
+    private final CoreGame game;
     /* ---------- konum / yön / anim ---------- */
     private float x, y;
     private boolean facingRight = true;
@@ -50,9 +52,10 @@ public class Goblin {
     private Vector2 knock = new Vector2();
     private float redFlash = 0f;
 
-    public Goblin(Player player, List<Goblin> crowd,
+    public Goblin(Player player, CoreGame game, List<Goblin> crowd,
                   float startX, float startY, List<GoldBag> loot) {
         this.player = player;
+        this.game   = game;
         this.crowd  = crowd;
         this.loot   = loot;
         this.x = startX; this.y = startY;
@@ -127,8 +130,13 @@ public class Goblin {
                 if (dist < ATTACK_RADIUS && attackCD <= 0f) {
                     st = ST.ATTACK; atkT = 0f; attackDone = false;
                 } else {
-                    x += dx / dist * SPEED * dt;
-                    y += dy / dist * SPEED * dt;
+                    float moveX = x + (dx / dist) * SPEED * dt;
+                    float moveY = y + (dy / dist) * SPEED * dt;
+
+                    if (canMoveTo(moveX, moveY)) {
+                        x = moveX;
+                        y = moveY;
+                    }
                     facingRight = dx > 0;
                 }
                 moveT += dt;
@@ -150,6 +158,8 @@ public class Goblin {
         }
         if (attackCD>0f) attackCD-=dt;
         if (redFlash>0f) redFlash-=dt;
+        x = MathUtils.clamp(x, .5f, game.getMap().getMapWidth()- .5f);
+        y = MathUtils.clamp(y, .5f, game.getMap().getMapHeight()- .5f);
     }
 
     /* ---------- render ---------- */
@@ -196,6 +206,19 @@ public class Goblin {
         }
     }
 
+
+    // suyun icinden gecemez fonksiyonu
+    private boolean canMoveTo(float targetX, float targetY) {
+        Polygon poly = new Polygon(new float[]{
+            -0.3f, -0.3f,
+            0.3f, -0.3f,
+            0.3f,  0.3f,
+            -0.3f,  0.3f
+        });
+        poly.setPosition(targetX, targetY);
+
+        return !game.getMap().isCellBlocked((int)targetX, (int)targetY, poly);
+    }
     /* ---------- getter ---------- */
     public float getX(){ return x; }  public float getY(){ return y; }
     public float getHealth(){ return hp; }  public float getMaxHealth(){ return MAX_HP; }

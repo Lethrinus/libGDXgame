@@ -28,7 +28,7 @@ public final class WaveManager implements GameEventListener {
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
     private final List<WaveSpec> waves = Arrays.asList(
-            new WaveSpec(2,  0, 0),
+            new WaveSpec(20,  0, 0),
             new WaveSpec(12,  4, 0),
             new WaveSpec(14,  5, 3),
             new WaveSpec(18, 10, 6)
@@ -38,7 +38,7 @@ public final class WaveManager implements GameEventListener {
     private final CoreGame game;
     private final GameEntityFactory factory;
     private final Random rng = new Random();
-
+    private final int MAX_ALIVE = 8; // max düşman sayısı
     private int currentWave = -1;
     private float intervalTimer = 0f;
     private static final float INTERVAL_LEN = 30f;
@@ -58,18 +58,20 @@ public final class WaveManager implements GameEventListener {
         switch (state){
 
             case IN_WAVE:
-                /* sırayla düşman çıkarmak */
                 spawnTimer -= dt;
-                if (spawnTimer <= 0f && !queue.isEmpty()) {
+
+                int alive = game.getGoblins().size() + game.getDynaList().size() + game.getBarrels().size();
+
+                if (spawnTimer <= 0f && !queue.isEmpty() && alive < MAX_ALIVE) {
                     queue.pollFirst().run();
                     spawnTimer = SPAWN_GAP;
                 }
 
                 /* dalga bitti mi? */
                 if (queue.isEmpty()
-                        && game.getGoblins().isEmpty()
-                        && game.getDynaList().isEmpty()
-                        && game.getBarrels().isEmpty()) {
+                    && game.getGoblins().isEmpty()
+                    && game.getDynaList().isEmpty()
+                    && game.getBarrels().isEmpty()) {
 
                     if (currentWave >= waves.size() - 1) {
                         state = State.COMPLETED;
@@ -82,6 +84,7 @@ public final class WaveManager implements GameEventListener {
                     }
                 }
                 break;
+
 
             case INTERVAL:
                 /* SPACE ile beklemeyi atla */
@@ -126,10 +129,14 @@ public final class WaveManager implements GameEventListener {
     }
 
     /* -------- spawn yardımcıları -------- */
-    private void spawnGoblin(){
+    private void spawnGoblin() {
         Vector2 p = randPos();
         game.addGoblin(factory.createGoblin(
-                game.getPlayer(), game.getGoblins(), p.x, p.y, game.getLoot()));
+            game.getPlayer(),
+            game,
+            game.getGoblins(),
+            p.x, p.y,
+            game.getLoot()));
     }
     private void spawnDyna(){
         Vector2 p = randPos();

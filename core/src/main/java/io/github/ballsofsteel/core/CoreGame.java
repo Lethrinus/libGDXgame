@@ -50,10 +50,10 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public void create() {
 
         batch = new SpriteBatch();
-        cam.setToOrtho(false, 20, 11.25f);
+        cam.setToOrtho(false, 44, 44f);
 
         map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
-        player = factory.createPlayer(this, cam, map, 8, 4.5f);
+        player = factory.createPlayer(this, cam, map, 15, 15);
 
         /* NPC – diyalog & yükseltme tetikleyici */
         npc = factory.createNPC(this,5, 5, new String[]{

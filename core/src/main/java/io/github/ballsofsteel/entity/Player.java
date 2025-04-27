@@ -362,14 +362,13 @@ public class Player {
 
                 /* -- Ana Goblin */
                 /* -------- goblinler -------- */
-                if (!attackExecuted){
-                    for (Goblin g : core.getGoblins()){
-                        if (g.isDead()) continue;
-                        float gx = g.getX()-x, gy = g.getY()-y;
-                        if (gx*gx+gy*gy <= attackRange*attackRange){
+                if(!attackExecuted){
+                    for(Goblin g : core.getGoblins()){
+                        float gx=g.getX()-x, gy=g.getY()-y;
+                        if(gx*gx+gy*gy <= attackRange*attackRange){
                             float ang = MathUtils.atan2(gy,gx)*MathUtils.radiansToDegrees;
                             g.takeDamage(attackDamage, attackKnockbackForce, ang);
-                            attackExecuted = true;
+                            attackExecuted = true;   // tek darbe → tek goblin
                             break;
                         }
                     }

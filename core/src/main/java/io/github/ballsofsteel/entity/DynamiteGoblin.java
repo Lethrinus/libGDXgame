@@ -48,6 +48,8 @@ public class DynamiteGoblin {
     private static final float THROW_DIST = 4.2f;       // bu mesafede durur/fırlatır
     private static final float MAX_HP     = 60f;
     private static final float FLASH_TIME = .15f;       // kırmızı parıltı süresi
+    private static final float THROW_COOLDOWN = 1.2f;   // eski değeri ~0.8
+
 
     /* ───────── referanslar ───────── */
     private final Player player;
@@ -58,7 +60,7 @@ public class DynamiteGoblin {
     private float x,y, hp=MAX_HP;
     private float flashTimer=0f;                       // red-flash sayacı
     private final Vector2 knock = new Vector2();       // geri tepme
-
+    private float throwCD = 0f;                         // alan ekle
 
 
     private enum ST{MOVE,THROW,DIE} private ST st=ST.MOVE;
@@ -74,7 +76,7 @@ public class DynamiteGoblin {
     /* ───────── ana update ───────── */
     public void update(float dt){
         bombs.removeIf(b->b.update(dt));
-
+        if (throwCD>0) throwCD-=dt;
         if(st==ST.DIE){ tState+=dt; return; }
 
         /* basit separation */
@@ -97,13 +99,17 @@ public class DynamiteGoblin {
                 released=true;
             }
             if(tThrow>=throwR.getAnimationDuration()) st=ST.MOVE;
-        }else{ // MOVE
+        }else{
+            // MOVE
             if(dist<KEEP_DIST){             // kaç – uzaklaş
                 x-=dx/dist*dt*2f; y-=dy/dist*dt*2f;
             }else if(dist>THROW_DIST){      // yaklaş
                 x+=dx/dist*dt*1.7f; y+=dy/dist*dt*1.7f;
             }else{                          // atış mesafesi
-                st=ST.THROW; tThrow=0; released=false;
+                if(throwCD <= 0f)  {
+                    st = ST.THROW;
+                 tThrow=0; released=false;
+                throwCD = THROW_COOLDOWN;}
             }
         }
 

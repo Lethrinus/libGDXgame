@@ -26,7 +26,9 @@ public class TileMapRenderer {
     private static final String LAYER_GROUND    = "Ground";
     private static final String LAYER_COLLISION = "Collision";
     private static final String LAYER_BUSH      = "Bush";
+    private static final String LAYER_BUILDINGS = "Building";
     private static final String LAYER_TREETOP   = "TreeTop";
+    private static final String LAYER_WATER = "Water";
 
     private final TiledMap                   map;
     private final OrthogonalTiledMapRenderer renderer;
@@ -35,6 +37,13 @@ public class TileMapRenderer {
     private final float unitScale;
     private final float mapWidthTiles;
     private final float mapHeightTiles;
+
+    private final int groundLayerIndex;
+    private final int buildingLayerIndex;
+    private final int waterLayerIndex;
+    private final int treeTopLayerIndex;
+    private final int collisionLayerIndex;
+
 
     /* opsiyonel shader */
     private com.badlogic.gdx.graphics.glutils.ShaderProgram circleShader;
@@ -53,6 +62,13 @@ public class TileMapRenderer {
         mapHeightTiles = map.getProperties().get("height", Integer.class);
 
         renderer = new OrthogonalTiledMapRenderer(map, unitScale);
+
+        groundLayerIndex = layerIndex(LAYER_GROUND);
+        buildingLayerIndex = layerIndex(LAYER_BUILDINGS);
+        waterLayerIndex = layerIndex(LAYER_WATER);
+        treeTopLayerIndex = layerIndex(LAYER_TREETOP);
+        collisionLayerIndex = layerIndex(LAYER_COLLISION);
+
     }
 
     /* ------------------------------------------------------------------ */
@@ -65,7 +81,7 @@ public class TileMapRenderer {
     /*  Çizim (katman adlarıyla)                                          */
     /* ------------------------------------------------------------------ */
     public void renderBase() {                      // zemin + binalar
-        int[] idx = { layerIndex(LAYER_GROUND), layerIndex("Building") };
+        int[] idx = { waterLayerIndex, groundLayerIndex, collisionLayerIndex, buildingLayerIndex, treeTopLayerIndex};
         renderer.setView(camera);
         renderer.render(idx);
     }
@@ -121,8 +137,29 @@ public class TileMapRenderer {
             || tileX >= mapWidthTiles || tileY >= mapHeightTiles)
             return true;
 
-        TiledMapTileLayer col = (TiledMapTileLayer) map.getLayers()
-            .get(LAYER_COLLISION);
+        // Önce Water layer'a bak
+        TiledMapTileLayer waterLayer = (TiledMapTileLayer) map.getLayers().get(LAYER_WATER);
+        if (waterLayer != null) {
+            TiledMapTileLayer.Cell waterCell = waterLayer.getCell(tileX, tileY);
+            if (waterCell != null && waterCell.getTile() != null) {
+                Object blocked = waterLayer.getProperties().get("blocked");
+                if (blocked != null && Boolean.parseBoolean(blocked.toString())) {
+
+                    TiledMapTileLayer bridgeLayer = (TiledMapTileLayer) map.getLayers().get(LAYER_BUILDINGS);
+                    if (bridgeLayer != null) {
+                        TiledMapTileLayer.Cell bridgeCell = bridgeLayer.getCell(tileX, tileY);
+                        if (bridgeCell != null && bridgeCell.getTile() != null) {
+                            return false;
+                        }
+                    }
+                    // Üstünde köprü yok → blokaj
+                    return true;
+                }
+            }
+        }
+
+        // Sonra normal Collision layer'a bak
+        TiledMapTileLayer col = (TiledMapTileLayer) map.getLayers().get(LAYER_COLLISION);
         if (col == null) return false;
 
         TiledMapTileLayer.Cell cell = col.getCell(tileX, tileY);

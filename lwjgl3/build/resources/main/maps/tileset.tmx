@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="32" height="32" tilewidth="32" tileheight="32" infinite="0" nextlayerid="7" nextobjectid="1">
- <tileset firstgid="1" source="Tilesets/Tilemap_Flat.tsx"/>
+ <tileset firstgid="1" source="Tilesets/Ground.tsx"/>
  <tileset firstgid="161" source="Tilesets/Tree.tsx"/>
  <tileset firstgid="593" source="Tilesets/Bush.tsx"/>
  <tileset firstgid="597" source="GoldMine_Active.tsx"/>

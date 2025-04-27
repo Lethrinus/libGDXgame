@@ -19,6 +19,7 @@ public interface EntityFactory {
 
     /* -------- goblin (normal & patrolden) -------- */
     Goblin createGoblin(Player        player,
+                        CoreGame       game,
                         List<Goblin>  crowd,
                         float         x, float y,
                         List<GoldBag> sharedLoot);
