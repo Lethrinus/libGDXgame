@@ -26,7 +26,7 @@ public class TileMapRenderer {
     private OrthographicCamera camera;
 
     private float mapWidth, mapHeight;
-    private final float unitScale = 1f / 32f;
+    private final float unitScale = 1f / 48f;
 
     // Shader for Bush and TreeTop layers
     private com.badlogic.gdx.graphics.glutils.ShaderProgram circleShader;
@@ -135,7 +135,7 @@ public class TileMapRenderer {
         if (tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
             return true;
         }
-        TiledMapTileLayer collisionLayer = (TiledMapTileLayer) map.getLayers().get(1);
+        TiledMapTileLayer collisionLayer = (TiledMapTileLayer) map.getLayers().get(0);
         if (collisionLayer == null) return false;
 
         Cell cell = collisionLayer.getCell(tileX, tileY);

@@ -461,11 +461,7 @@ public class Player {
         return new Polygon(vertices);
     }
 
-    /**
-     * Renders the player and its ghost trail.
-     *
-     * @param batch The SpriteBatch used for rendering.
-     */
+
     public void render(SpriteBatch batch) {
         // Determine current frame based on whether attacking or moving.
         TextureRegion frame = isAttacking ? currentAttackAnim.getKeyFrame(attackStateTime)

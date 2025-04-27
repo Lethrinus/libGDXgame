@@ -52,7 +52,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         batch = new SpriteBatch();
         cam.setToOrtho(false, 16, 9);
 
-        map    = new TileMapRenderer(cam, "maps/tileset.tmx");
+        map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
         player = factory.createPlayer(this, cam, map, 8, 4.5f);
 
         /* NPC – diyalog & yükseltme tetikleyici */
