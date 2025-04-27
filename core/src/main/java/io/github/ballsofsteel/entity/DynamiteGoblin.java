@@ -59,6 +59,8 @@ public class DynamiteGoblin {
     private float flashTimer=0f;                       // red-flash sayacı
     private final Vector2 knock = new Vector2();       // geri tepme
 
+
+
     private enum ST{MOVE,THROW,DIE} private ST st=ST.MOVE;
     private float tThrow,tState; private boolean released;
 
@@ -190,7 +192,8 @@ public class DynamiteGoblin {
             b.draw(fr, pos.x-w/2f, pos.y-h/2f, w, h);
         }
     }
-
+    public void dispose() {
+    }
     /* ───────── getter’lar ───────── */
     public float getX(){ return x; }
     public float getY(){ return y; }

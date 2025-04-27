@@ -43,6 +43,9 @@ public class Player {
     private float healStateTime = 0f;
     private boolean isHealing = false;
     private float healScale = 1f / 64f; // Scale factor for heal effect.
+    private float damageMultiplier = 1f;
+    private float speedMultiplier = 1f;
+
 
     // Currently active animations.
     private Animation<TextureRegion> currentMovementAnim;
@@ -101,11 +104,18 @@ public class Player {
     private float attackDamage = 20f;
     private float attackKnockbackForce = 4f;
     private float attackRange = 1.5f;
-
+    float dmg = attackDamage * damageMultiplier;
+    float moveSpee = (isDashing? dashSpeed : speed*speedMultiplier);
     public float getX() { return x; }
     public float getY() { return y; }
     public float getHealth() { return health; }
     public float getMaxHealth() { return maxHealth; }
+    public float getDashCooldown() {
+        return dashCooldown;
+    }
+    public float getDashCooldownTimer() {
+        return dashCooldownTimer;
+    }
 
     private Inventory inventory;
 
@@ -166,6 +176,9 @@ public class Player {
         isHealing = true;
         healStateTime = 0f;
     }
+    // ARTTIRICI METODLAR
+    public void increaseAttackDamage(float mult){ damageMultiplier *= mult; }
+    public void increaseMoveSpeed   (float mult){ speedMultiplier  *= mult; }
 
     private Animation<TextureRegion> buildAnimation(TextureRegion region, float frameDuration, Animation.PlayMode mode) {
         TextureRegion[][] tmp = region.split(frameWidth, frameHeight);
@@ -348,15 +361,20 @@ public class Player {
                 }
 
                 /* -- Ana Goblin */
-                Goblin g = core.getMainGoblin();
-                if (!attackExecuted && g != null && !g.isDead()) {
-                    float ddx = g.getX() - x, ddy = g.getY() - y;        // ← yine isimler değişti
-                    if (ddx*ddx + ddy*ddy <= attackRange*attackRange) {
-                        float ang = MathUtils.atan2(ddy, ddx) * MathUtils.radiansToDegrees;
-                        g.takeDamage(attackDamage, attackKnockbackForce, ang);
-                        attackExecuted = true;
+                /* -------- goblinler -------- */
+                if (!attackExecuted){
+                    for (Goblin g : core.getGoblins()){
+                        if (g.isDead()) continue;
+                        float gx = g.getX()-x, gy = g.getY()-y;
+                        if (gx*gx+gy*gy <= attackRange*attackRange){
+                            float ang = MathUtils.atan2(gy,gx)*MathUtils.radiansToDegrees;
+                            g.takeDamage(attackDamage, attackKnockbackForce, ang);
+                            attackExecuted = true;
+                            break;
+                        }
                     }
                 }
+
             }
             if (attackStateTime >= attackDuration) isAttacking = false;
         }
@@ -484,12 +502,8 @@ public class Player {
     }
 
     // Getter methods for dash cooldown UI.
-    public float getDashCooldown() {
-        return dashCooldown;
-    }
-    public float getDashCooldownTimer() {
-        return dashCooldownTimer;
-    }
+
+
 
     /**
      * Disposes of player resources.

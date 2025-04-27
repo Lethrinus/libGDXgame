@@ -9,6 +9,10 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
+import io.github.ballsofsteel.core.CoreGame;
+import io.github.ballsofsteel.events.EventBus;
+import io.github.ballsofsteel.events.GameEvent;
+import io.github.ballsofsteel.events.GameEventType;
 
 /**
  * NPC class with an idle animation and a typewriter dialogue effect.
@@ -24,7 +28,6 @@ public class NPC {
 
     // Custom speech bubble texture (must be a PNG file in assets)
     private Texture bubbleTexture;
-
     // BitmapFont for dialogue text
     private BitmapFont font;
 
@@ -52,7 +55,7 @@ public class NPC {
     private Texture pawnTexture;
 
     private float lastDistance = Float.MAX_VALUE;
-
+    private static boolean firstWaveStarted = false;
 
     /**
      * Constructs an NPC at position (x, y) with the given dialogue lines.
@@ -95,31 +98,41 @@ public class NPC {
         currentLineIndex = 0;
     }
 
-    /**
-     * Updates the NPC's state and handles dialogue interaction and the typewriter effect.
-     * Pressing the E key when the player is within the interaction radius starts or advances dialogue.
-     */
     public void update(float delta, Vector2 playerPos) {
+
         stateTime += delta;
         float dist = playerPos.dst(x, y);
         lastDistance = dist;
 
-        // Check if player is close enough and E key is pressed
+        /* --- E tuşu --- */
         if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+
+            /* DALGA ARASI → doğrudan menü iste */
+            if (firstWaveStarted && io.github.ballsofsteel.core.WaveManager.isIntervalActive()) {
+                EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
+                return;
+            }
+
+            /* normal diyalog akışı */
             if (!inDialogue) {
                 inDialogue = true;
                 currentLineIndex = 0;
-                startTypingEffect(dialogues[currentLineIndex]);
+                startTypingEffect(dialogues[0]);
             } else {
                 if (!typedComplete) {
-                    // If the current line is still typing, complete it immediately
                     typedIndex = dialogues[currentLineIndex].length();
                     typedComplete = true;
                 } else {
-                    // Advance to the next dialogue line or end dialogue if finished
                     currentLineIndex++;
                     if (currentLineIndex >= dialogues.length) {
                         inDialogue = false;
+
+                        if (!firstWaveStarted) {
+                            firstWaveStarted = true;
+                            EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
+                        } else {
+                            EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
+                        }
                     } else {
                         startTypingEffect(dialogues[currentLineIndex]);
                     }
@@ -127,19 +140,17 @@ public class NPC {
             }
         }
 
-        // Update the typewriter effect if dialogue is active and not complete
+        /* typewriter güncelle */
         if (inDialogue && !typedComplete) {
             typedTimer += delta;
-            int charsToShow = (int)(typedTimer * typedSpeed);
-            int totalLength = dialogues[currentLineIndex].length();
-            if (charsToShow >= totalLength) {
-                charsToShow = totalLength;
-                typedComplete = true;
-            }
-            typedIndex = charsToShow;
-            typedText = dialogues[currentLineIndex];
+            int show = (int)(typedTimer * typedSpeed);
+            int total = dialogues[currentLineIndex].length();
+            if (show >= total) { show = total; typedComplete = true; }
+            typedIndex = show;
+            typedText  = dialogues[currentLineIndex];
         }
     }
+
 
     /**
      * Initializes the typewriter effect for a new dialogue line.

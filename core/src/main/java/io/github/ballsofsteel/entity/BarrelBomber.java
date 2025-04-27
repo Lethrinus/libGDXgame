@@ -93,4 +93,7 @@ public class BarrelBomber {
     }
 
     public boolean isFinished(){ return exploding && explodeA.isAnimationFinished(boomT); }
+
+    public void dispose() {
+    }
 }

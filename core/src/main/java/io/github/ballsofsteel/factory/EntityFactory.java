@@ -18,18 +18,10 @@ public interface EntityFactory {
                         float x, float y);
 
     /* -------- goblin (normal & patrolden) -------- */
-    Goblin createGoblin(Player player,
-                        float x, float y,
-                        float patrolMinX,float patrolMaxX,
-                        float patrolMinY,float patrolMaxY,
+    Goblin createGoblin(Player        player,
+                        List<Goblin>  crowd,
+                        float         x, float y,
                         List<GoldBag> sharedLoot);
-
-    Goblin createPatrollingGoblin(Player player,
-                                  float x, float y,
-                                  float patrolMinX,float patrolMaxX,
-                                  float patrolMinY,float patrolMaxY,
-                                  List<Vector2> waypoints,
-                                  List<GoldBag> sharedLoot);
 
     /* -------- dinamit goblini -------- */
     DynamiteGoblin createDynamiteGoblin(Player       player,
@@ -43,5 +35,5 @@ public interface EntityFactory {
                                         float x,float y);
 
     /* -------- NPC -------- */
-    NPC createNPC(float x,float y,String[] lines);
+    NPC createNPC(CoreGame game,float x,float y,String[] lines);
 }

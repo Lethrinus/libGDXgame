@@ -1,469 +1,207 @@
+/*  src/io/github/ballsofsteel/entity/Goblin.java  */
 package io.github.ballsofsteel.entity;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
-import io.github.ballsofsteel.events.EventBus;
-import io.github.ballsofsteel.events.GameEvent;
-import io.github.ballsofsteel.events.GameEventType;
+import io.github.ballsofsteel.ui.HealthBarRenderer;
 
-import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Goblin enemy class with AI behavior refactored using the Strategy Pattern.
- * It supports patrol, chase, and attack behaviors.
- */
 public class Goblin {
-    // Position and movement
+
+    /* ---------- sabitler ---------- */
+    private static final float SCALE          = 1f / 72f;
+    private static final float SEPARATE_DIST2 = 0.40f;       // kare mesafe^2
+    private static final float SPEED          = 2.2f;
+    private static final float ALERT_RADIUS   = 5.0f;
+    private static final float ATTACK_RADIUS  = 1.0f;
+    private static final float ATTACK_HIT_T   = 0.15f;
+    private static final float ATTACK_DUR     = 0.7f;
+    private static final float ATTACK_DMG     = 10f;
+    private static final float ATTACK_KB      = 3.5f;
+    private static final float ATTACK_CD      = 0.9f;
+    private static final float MAX_HP         = 50f;
+    private static final float FLASH_TIME     = 0.2f;
+    private static final float GOLD_SPREAD    = .4f;
+
+    /* ---------- referanslar ---------- */
+    private final Player player;
+    private final List<Goblin> crowd;
+    private final List<GoldBag> loot;
+
+    /* ---------- konum / yön / anim ---------- */
     private float x, y;
-    private float speed = 2.0f;
+    private boolean facingRight = true;
+    private final Texture atlas;
+    private final Animation<TextureRegion> runR, runL, idleR, idleL;
+    private final Animation<TextureRegion> atkR, atkL, atkU, atkD;
+    private final Animation<TextureRegion> deathAnim;
+    private float moveT = 0f, atkT = 0f, deathT = 0f;
 
-    // Patrol boundaries and target
-    private float patrolMinX, patrolMaxX, patrolMinY, patrolMaxY;
-    private float patrolTargetX, patrolTargetY;
+    /* ---------- durum ---------- */
+    private enum ST {MOVE, ATTACK, DIE}
+    private ST st = ST.MOVE;
+    private boolean attackDone = false;
+    private float attackCD = 0f;
+    private float hp = MAX_HP;
+    private Vector2 knock = new Vector2();
+    private float redFlash = 0f;
 
-    // Distance thresholds.
-    private float alertRadius = 4.0f;
-    private float attackRadius = 1.0f;
-
-    // Animations.
-    private Texture atlas;
-    private Animation<TextureRegion> idleAnimation, runRight, runLeft, attackRight, attackLeft, attackUp, attackDown;
-    private Animation<TextureRegion> currentMovementAnim, currentAttackAnim;
-
-    private float movementStateTime = 0f;
-    private float attackStateTime = 0f;
-    private boolean isAttacking = false;
-
-    private float scale = 1f / 72f;
-
-    // Reference to the player
-    private Player player;
-
-    // Health and knockback.
-    private float maxHealth = 50f;
-    private float health = maxHealth;
-
-    private Vector2 knockback = new Vector2(0, 0);
-    private float knockbackDecay = 5f;
-
-    private boolean attackExecuted = false;
-    private float attackHitTime = 0.15f;
-    private float attackDuration = 0.7f;
-    private float attackDamage = 10f;
-    private float attackKnockbackForce = 3f;
-
-    // Attack cooldown.
-    private float attackCooldownTimer = 0f;
-    private float attackCooldownDuration = 0.8f;
-    private float minAttackDistance = 0.8f;
-
-    // Patrol waypoints.
-    private List<Vector2> patrolWaypoints = new ArrayList<>();
-    private int currentWaypointIndex = 0;
-    private boolean usingWaypoints = false;
-    private float waypointPauseDuration = 2.0f;
-    private float currentPauseTime = 0f;
-    private boolean isPaused = false;
-    private float lookAroundTimer = 0f;
-    private float lookDirection = 1f; // 1 for right, -1 for left
-
-    // Red flash effect.
-    private float redFlashDuration = 0.2f;
-    private float redFlashTimer = 0f;
-
-    // Death animation.
-    private Animation<TextureRegion> deathAnimation;
-    private float deathStateTime = 0f;
-    private boolean isDying = false;
-    private boolean isDead = false;
-    private Texture deathTexture;
-
-    // Death disappearance delay.
-    private float deathWaitTime = 0f;
-    private float deathDisappearDelay = 5f;
-    private final List<GoldBag> lootRef;
-    // Strategy Pattern for AI behavior.
-    private GoblinState currentState;
-
-    /**
-     * Constructs a Goblin enemy.
-     *
-     * @param player       Reference to the player.
-     * @param startX       Initial X position.
-     * @param startY       Initial Y position.
-     * @param patrolMinX   Minimum X boundary for patrol.
-     * @param patrolMaxX   Maximum X boundary for patrol.
-     * @param patrolMinY   Minimum Y boundary for patrol.
-     * @param patrolMaxY   Maximum Y boundary for patrol.
-     */
-    public Goblin(Player player,
-                  float startX, float startY,
-                  float patrolMinX, float patrolMaxX,
-                  float patrolMinY, float patrolMaxY,List<GoldBag> loot) {
-
+    public Goblin(Player player, List<Goblin> crowd,
+                  float startX, float startY, List<GoldBag> loot) {
         this.player = player;
-        this.lootRef = loot;
-        this.x = startX;
-        this.y = startY;
-        this.patrolMinX = patrolMinX;
-        this.patrolMaxX = patrolMaxX;
-        this.patrolMinY = patrolMinY;
-        this.patrolMaxY = patrolMaxY;
+        this.crowd  = crowd;
+        this.loot   = loot;
+        this.x = startX; this.y = startY;
 
         atlas = new Texture(Gdx.files.internal("Goblin/goblin_animations.png"));
+        TextureRegion runRow  = new TextureRegion(atlas, 2,   2, 1152, 190);
+        TextureRegion idleRow = new TextureRegion(atlas, 2, 194, 1152, 190);
+        TextureRegion atkDRow = new TextureRegion(atlas, 2, 386, 1152, 190);
+        TextureRegion atkRRow = new TextureRegion(atlas, 2, 578, 1152, 190);
+        TextureRegion atkURow = new TextureRegion(atlas, 2, 770, 1152, 190);
+        TextureRegion deadRow = new TextureRegion(
+            new Texture(Gdx.files.internal("deadanimation.png")),
+            2, 2, 1792, 128);
 
-        // Build running animations.
-        TextureRegion runRow = new TextureRegion(atlas, 2, 2, 1152, 190);
-        runRight = buildAnimation(runRow, 6, 0.1f, Animation.PlayMode.LOOP);
-        runLeft = mirrorAnimation(runRight);
-
-        // Build idle animation.
-        TextureRegion idleRow = new TextureRegion(atlas, 2, 194, 1344, 190);
-        idleAnimation = buildAnimation(idleRow, 7, 0.1f, Animation.PlayMode.LOOP);
-        currentMovementAnim = idleAnimation;
-
-        // Build attack animations.
-        TextureRegion attackBRow = new TextureRegion(atlas, 2, 386, 1152, 190);
-        attackDown = buildAnimation(attackBRow, 6, 0.13f, Animation.PlayMode.NORMAL);
-        TextureRegion attackRRow = new TextureRegion(atlas, 2, 578, 1152, 190);
-        attackRight = buildAnimation(attackRRow, 6, 0.13f, Animation.PlayMode.NORMAL);
-        attackLeft = mirrorAnimation(attackRight);
-        TextureRegion attackURow = new TextureRegion(atlas, 2, 770, 1152, 190);
-        attackUp = buildAnimation(attackURow, 6, 0.13f, Animation.PlayMode.NORMAL);
-
-        // Build death animation.
-        deathTexture = new Texture(Gdx.files.internal("deadanimation.png"));
-        TextureRegion dead1 = new TextureRegion(deathTexture, 2, 2, 1792, 128);
-        deathAnimation = buildAnimation(dead1, 14, 0.1f, Animation.PlayMode.NORMAL);
-
-        pickRandomPatrolTarget();
-
-        // Initialize AI state to Patrol.
-        currentState = new PatrolState();
+        runR  = build(runRow ,6,0.12f,true);
+        runL  = mirror(runR);
+        idleR = build(idleRow,6,0.25f,true);
+        idleL = mirror(idleR);
+        atkR  = build(atkRRow,6,0.13f,false);
+        atkL  = mirror(atkR);
+        atkD  = build(atkDRow,6,0.13f,false);
+        atkU  = build(atkURow,6,0.13f,false);
+        deathAnim = build(deadRow,14,0.1f,false);
+    }
+    private Animation<TextureRegion> build(TextureRegion src,
+                                           int frames,float dur,boolean loop){
+        int w = src.getRegionWidth()/frames, h = src.getRegionHeight();
+        Animation<TextureRegion> a =
+            new Animation<>(dur, src.split(w,h)[0]);
+        a.setPlayMode(loop? Animation.PlayMode.LOOP
+            : Animation.PlayMode.NORMAL);
+        return a;
+    }
+    private Animation<TextureRegion> mirror(Animation<TextureRegion> src){
+        TextureRegion[] k = src.getKeyFrames(), m=new TextureRegion[k.length];
+        for(int i=0;i<k.length;i++){ m[i]=new TextureRegion(k[i]); m[i].flip(true,false);}
+        Animation<TextureRegion> a =
+            new Animation<>(src.getFrameDuration(),m);
+        a.setPlayMode(src.getPlayMode());
+        return a;
     }
 
-    // --------------------- Animation Helpers ---------------------
-    private Animation<TextureRegion> buildAnimation(TextureRegion region, int numFrames, float frameDuration, Animation.PlayMode mode) {
-        int w = region.getRegionWidth() / numFrames;
-        int h = region.getRegionHeight();
-        TextureRegion[][] tmp = region.split(w, h);
-        TextureRegion[] frames = tmp[0];
-        Animation<TextureRegion> anim = new Animation<>(frameDuration, frames);
-        anim.setPlayMode(mode);
-        return anim;
-    }
-
-    private Animation<TextureRegion> mirrorAnimation(Animation<TextureRegion> original) {
-        TextureRegion[] origFrames = original.getKeyFrames();
-        TextureRegion[] mirrored = new TextureRegion[origFrames.length];
-        for (int i = 0; i < origFrames.length; i++) {
-            TextureRegion tmp = new TextureRegion(origFrames[i]);
-            tmp.flip(true, false);
-            mirrored[i] = tmp;
+    /* ---------- update ---------- */
+    public void update(float dt){
+        if (st == ST.DIE){
+            deathT += dt;
+            return;
         }
-        Animation<TextureRegion> anim = new Animation<>(original.getFrameDuration(), mirrored);
-        anim.setPlayMode(original.getPlayMode());
-        return anim;
-    }
 
-    // --------------------- Patrol Helpers ---------------------
-    private void pickRandomPatrolTarget() {
-        patrolTargetX = MathUtils.random(patrolMinX, patrolMaxX);
-        patrolTargetY = MathUtils.random(patrolMinY, patrolMaxY);
-    }
-
-    private void moveToNextWaypoint() {
-        currentWaypointIndex = (currentWaypointIndex + 1) % patrolWaypoints.size();
-        isPaused = true;
-        currentPauseTime = 0f;
-    }
-
-    private void moveTowards(float tx, float ty, float moveSpeed, float delta) {
-        float dx = tx - x;
-        float dy = ty - y;
-        float d2 = dx * dx + dy * dy;
-        if (d2 < 0.0001f) return;
-        float dist = (float) Math.sqrt(d2);
-        float nx = dx / dist;
-        float ny = dy / dist;
-        x += nx * moveSpeed * delta;
-        y += ny * moveSpeed * delta;
-    }
-
-    // --------------------- Public Methods ---------------------
-
-    /**
-     * Sets patrol waypoints for the goblin.
-     *
-     * @param waypoints A list of Vector2 positions for patrolling.
-     */
-    public void setPatrolWaypoints(List<Vector2> waypoints) {
-        if (waypoints != null && !waypoints.isEmpty()) {
-            this.patrolWaypoints = new ArrayList<>(waypoints);
-            this.currentWaypointIndex = 0;
-            this.usingWaypoints = true;
+        /* separation */
+        for (Goblin g : crowd){
+            if (g==this || g.st==ST.DIE) continue;
+            float dx = x-g.x, dy = y-g.y, d2 = dx*dx+dy*dy;
+            if (d2 < SEPARATE_DIST2){
+                float d=(float)Math.sqrt(d2);
+                if (d>0){ x+=dx/d*dt*1.5f; y+=dy/d*dt*1.5f; }
+            }
         }
-    }
 
-    /**
-     * Applies damage, knockback, and triggers the red flash effect.
-     *
-     * @param damage         Amount of damage.
-     * @param knockbackForce Knockback force.
-     * @param angleDegrees   Direction of knockback in degrees.
-     */
-    public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
-        health -= damage;
-        if (health < 0) health = 0;
-        float angleRad = MathUtils.degreesToRadians * angleDegrees;
-        knockback.set(knockbackForce * MathUtils.cos(angleRad) * 1.5f,
-            knockbackForce * MathUtils.sin(angleRad) * 1.5f);
-        redFlashTimer = redFlashDuration;
-    }
+        /* knockback */
+        if (knock.len2()>.0001f){
+            x+=knock.x*dt; y+=knock.y*dt;
+            knock.scl(1-dt*4f);
+        }
 
-    // --------------------- Update & Render ---------------------
+        float dx = player.getX()-x, dy = player.getY()-y;
+        float dist = (float)Math.sqrt(dx*dx+dy*dy);
 
-    /**
-     * Updates the goblin behavior using the current AI strategy.
-     *
-     * Note: If the goblin is already attacking, we do not change its state until the attack animation completes.
-     *
-     * @param delta Time elapsed since last frame.
-     */
-    public void update(float delta) {
-        if (isDead) return;
+        switch (st){
 
-        if (isDying) {
-            deathStateTime += delta;
-            if (deathAnimation.isAnimationFinished(deathStateTime)) {
-                deathWaitTime += delta;
-                if (deathWaitTime >= deathDisappearDelay) {
-                    isDead = true;
+            case MOVE:
+                if (dist < ATTACK_RADIUS && attackCD <= 0f) {
+                    st = ST.ATTACK; atkT = 0f; attackDone = false;
+                } else {
+                    x += dx / dist * SPEED * dt;
+                    y += dy / dist * SPEED * dt;
+                    facingRight = dx > 0;
                 }
-            }
-            return;
+                moveT += dt;
+                break;
+
+            case ATTACK:
+                atkT += dt;
+                if (!attackDone && atkT >= ATTACK_HIT_T){
+                    if (dist <= ATTACK_RADIUS){
+                        float ang = MathUtils.atan2(dy,dx)*MathUtils.radiansToDegrees;
+                        player.takeDamage(ATTACK_DMG, ATTACK_KB, ang);
+                    }
+                    attackDone = true;
+                }
+                if (atkT >= ATTACK_DUR){
+                    st = ST.MOVE; attackCD = ATTACK_CD; atkT=0f;
+                }
+                break;
         }
-
-        if (attackCooldownTimer > 0) {
-            attackCooldownTimer -= delta;
-        }
-
-        if (health <= 0 && !isDying) {
-            die();
-            return;
-
-        }
-
-        float dxP = player.getX() - x;
-        float dyP = player.getY() - y;
-        float distToPlayer = (float) Math.sqrt(dxP * dxP + dyP * dyP);
-
-        // Only change state if not already in an attack animation.
-        if (!isAttacking) {
-            if (player.isInBush()) {
-                currentState = new PatrolState();
-            } else if (distToPlayer < attackRadius && attackCooldownTimer <= 0) {
-                currentState = new AttackState();
-            } else if (distToPlayer < alertRadius) {
-                currentState = new ChaseState();
-            } else {
-                currentState = new PatrolState();
-            }
-        }
-
-        // Delegate behavior update to the current state.
-        currentState.update(this, delta);
-
-        // Apply knockback.
-        if (knockback.len() > 0.01f) {
-            x += knockback.x * delta;
-            y += knockback.y * delta;
-            knockback.scl(1 - knockbackDecay * delta);
-            if (knockback.len() < 0.01f) {
-                knockback.set(0, 0);
-            }
-        }
-        movementStateTime += delta;
-        if (redFlashTimer > 0) redFlashTimer -= delta;
+        if (attackCD>0f) attackCD-=dt;
+        if (redFlash>0f) redFlash-=dt;
     }
 
-    /**
-     * Renders the goblin.
-     *
-     * @param batch The SpriteBatch used for drawing.
-     */
-    public void render(SpriteBatch batch) {
-        if (isDead) return;
-        TextureRegion frame;
-        if (isDying) {
-            frame = deathAnimation.getKeyFrame(deathStateTime);
-        } else if (isAttacking) {
-            frame = currentAttackAnim.getKeyFrame(attackStateTime);
+    /* ---------- render ---------- */
+    public void render(SpriteBatch b){
+        TextureRegion fr;
+        if (st == ST.DIE){
+            fr = deathAnim.getKeyFrame(deathT);
+        } else if (st == ST.ATTACK){
+            float angle = MathUtils.atan2(player.getY()-y,
+                player.getX()-x) * MathUtils.radiansToDegrees;
+            if      (angle>=-45 && angle<45)   fr = facingRight? atkR.getKeyFrame(atkT): atkL.getKeyFrame(atkT);
+            else if (angle>=45 && angle<135)   fr = atkU.getKeyFrame(atkT);
+            else if (angle>=-135 && angle<-45) fr = atkD.getKeyFrame(atkT);
+            else                               fr = facingRight? atkL.getKeyFrame(atkT): atkR.getKeyFrame(atkT);
         } else {
-            frame = currentMovementAnim.getKeyFrame(movementStateTime);
+            fr = facingRight? runR.getKeyFrame(moveT,true)
+                : runL.getKeyFrame(moveT,true);
         }
-        float drawW = frame.getRegionWidth() * scale;
-        float drawH = frame.getRegionHeight() * scale;
-        batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
 
-        if (!isDying && redFlashTimer > 0) {
-            batch.setColor(1, 0, 0, 0.3f);
-            batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
-            batch.setColor(1, 1, 1, 1);
+        float w = fr.getRegionWidth()*SCALE, h = fr.getRegionHeight()*SCALE;
+        b.draw(fr, x-w/2f, y-h/2f, w, h);
+
+        if (redFlash>0f && st!=ST.DIE){
+            b.setColor(1,0,0,0.35f);
+            b.draw(fr, x-w/2f, y-h/2f, w, h);
+            b.setColor(1,1,1,1);
         }
-    }
-    private void die(){
-        isDying = true;
-        deathStateTime = 0f;
-        // %20 ihtimalle çanta
-        if(MathUtils.randomBoolean(1f))
-            lootRef.add(new GoldBag(x,y));
-        io.github.ballsofsteel.events.EventBus.get()
-            .post(new GameEvent(GameEventType.ENEMY_DEFEATED,this));
-    }
-    /**
-     * Disposes of goblin resources.
-     */
-    public void dispose() {
-        if (deathTexture != null) {
-            deathTexture.dispose();
-        }
-        atlas.dispose();
+        if (st!=ST.DIE)
+            HealthBarRenderer.drawBar(b, x, y+0.8f, hp/MAX_HP, true);
     }
 
-    // --------------------- Getters ---------------------
-    public float getX() { return x; }
-    public float getY() { return y; }
-    public float getHealth() { return health; }
-    public float getMaxHealth() { return maxHealth; }
-    public boolean isDead() { return isDead; }
-    public boolean isDying() { return isDying; }
-
-    // --------------------- Strategy Pattern States ---------------------
-
-    /**
-     * GoblinState interface for AI behavior.
-     */
-    private interface GoblinState {
-        void update(Goblin goblin, float delta);
-    }
-
-    /**
-     * PatrolState: The goblin patrols using either waypoints or random targets.
-     */
-    private class PatrolState implements GoblinState {
-        @Override
-        public void update(Goblin goblin, float delta) {
-            if (usingWaypoints) {
-                if (isPaused) {
-                    currentPauseTime += delta;
-                    lookAroundTimer += delta;
-                    if (lookAroundTimer >= 0.8f) {
-                        lookDirection *= -1;
-                        lookAroundTimer = 0f;
-                    }
-                    currentMovementAnim = idleAnimation;
-                    if (currentPauseTime >= waypointPauseDuration) {
-                        isPaused = false;
-                    }
-                } else {
-                    Vector2 waypoint = patrolWaypoints.get(currentWaypointIndex);
-                    float wpDx = waypoint.x - x;
-                    float wpDy = waypoint.y - y;
-                    if (Math.abs(wpDx) < 0.1f && Math.abs(wpDy) < 0.1f) {
-                        moveToNextWaypoint();
-                    } else {
-                        moveTowards(waypoint.x, waypoint.y, speed, delta);
-                        currentMovementAnim = (wpDx < 0) ? runLeft : runRight;
-                    }
-                }
-            } else {
-                float pdx = patrolTargetX - x;
-                float pdy = patrolTargetY - y;
-                if (Math.abs(pdx) < 0.1f && Math.abs(pdy) < 0.1f) {
-                    pickRandomPatrolTarget();
-                }
-                moveTowards(patrolTargetX, patrolTargetY, speed, delta);
-                currentMovementAnim = (pdx < 0) ? runLeft : runRight;
-            }
+    /* ---------- damage / ölüm ---------- */
+    public void takeDamage(float dmg,float kb,float angDeg){
+        if (st==ST.DIE) return;
+        hp -= dmg; redFlash = FLASH_TIME;
+        float rad = angDeg*MathUtils.degreesToRadians;
+        knock.add(MathUtils.cos(rad)*kb, MathUtils.sin(rad)*kb);
+        if (hp<=0){
+            st = ST.DIE; deathT=0f;
+            if (MathUtils.randomBoolean(1f))
+                loot.add(new GoldBag(
+                    x+MathUtils.random(-GOLD_SPREAD,GOLD_SPREAD),
+                    y+MathUtils.random(-GOLD_SPREAD,GOLD_SPREAD)));
         }
     }
 
-    /**
-     * ChaseState: The goblin chases the player when within alert range.
-     */
-    private class ChaseState implements GoblinState {
-        @Override
-        public void update(Goblin goblin, float delta) {
-            float dx = player.getX() - x;
-            float dy = player.getY() - y;
-            float dist = (float) Math.sqrt(dx * dx + dy * dy);
-            if (dist > minAttackDistance) {
-                moveTowards(player.getX(), player.getY(), speed * 1.4f, delta);
-            }
-            currentMovementAnim = (dx < 0) ? runLeft : runRight;
-        }
-    }
+    /* ---------- getter ---------- */
+    public float getX(){ return x; }  public float getY(){ return y; }
+    public float getHealth(){ return hp; }  public float getMaxHealth(){ return MAX_HP; }
+    public boolean isDead(){ return st==ST.DIE && deathAnim.isAnimationFinished(deathT); }
+    public boolean isDying(){ return st==ST.DIE && !isDead(); }
 
-    /**
-     * AttackState: The goblin attacks the player.
-     * Once an attack starts, the full attack animation plays out.
-     * At the hit moment, damage is applied only if the player is within range.
-     * After the animation finishes, the goblin transitions to chase (if within alert range) or patrol.
-     */
-    private class AttackState implements GoblinState {
-        @Override
-        public void update(Goblin goblin, float delta) {
-            // Start the attack animation if not already started.
-            if (!isAttacking) {
-                isAttacking = true;
-                attackStateTime = 0f;
-                attackExecuted = false;
-                float dx = player.getX() - x;
-                float dy = player.getY() - y;
-                float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-                if (angle >= -45 && angle < 45) {
-                    currentAttackAnim = attackRight;
-                } else if (angle >= 45 && angle < 135) {
-                    currentAttackAnim = attackUp;
-                } else if (angle >= -135 && angle < -45) {
-                    currentAttackAnim = attackDown;
-                } else {
-                    currentAttackAnim = attackLeft;
-                }
-            }
-            attackStateTime += delta;
-            // At the hit moment, if the player is still in range, apply damage.
-            if (!attackExecuted && attackStateTime >= attackHitTime) {
-                float dx = player.getX() - x;
-                float dy = player.getY() - y;
-                float dist = (float) Math.sqrt(dx * dx + dy * dy);
-                if (dist <= attackRadius) {
-                    float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-                    player.takeDamage(attackDamage, attackKnockbackForce, angle);
-                }
-                attackExecuted = true;
-            }
-            // Once the full attack animation completes, reset attack state and transition.
-            if (attackStateTime >= attackDuration) {
-                isAttacking = false;
-                attackExecuted = false;
-                attackCooldownTimer = attackCooldownDuration;
-                float dx = player.getX() - x;
-                float dy = player.getY() - y;
-                float dist = (float) Math.sqrt(dx * dx + dy * dy);
-                if (dist < alertRadius) {
-                    currentState = new ChaseState();
-                } else {
-                    currentState = new PatrolState();
-                }
-            }
-        }
-    }
+    /* ---------- dispose (boş) ---------- */
+    public void dispose(){}
 }

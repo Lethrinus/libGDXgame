@@ -32,27 +32,15 @@ public class GameEntityFactory implements EntityFactory {
 
 
 
-    @Override
-    public Goblin createGoblin(Player player,
-                               float x,float y,
-                               float minX,float maxX,
-                               float minY,float maxY,
-                               List<GoldBag> loot){
-        return new Goblin(player,x,y,minX,maxX,minY,maxY,loot);
-    }
 
     @Override
-    public Goblin createPatrollingGoblin(Player player,
-                                         float x,float y,
-                                         float minX,float maxX,
-                                         float minY,float maxY,
-                                         List<Vector2> wp,
-                                         List<GoldBag> loot){
-        Goblin g = createGoblin(player,x,y,minX,maxX,minY,maxY,loot);
-        if(wp!=null && !wp.isEmpty()) g.setPatrolWaypoints(new ArrayList<>(wp));
-        return g;
-    }
+    public Goblin createGoblin(Player        player,
+                               List<Goblin>  crowd,
+                               float         x, float y,
+                               List<GoldBag> loot) {
 
+        return new Goblin(player, crowd, x, y, loot);
+    }
 
     @Override
     public DynamiteGoblin createDynamiteGoblin(Player player,
@@ -68,7 +56,7 @@ public class GameEntityFactory implements EntityFactory {
         return new BarrelBomber(p,crowd,x,y);
     }
 
-    @Override public NPC createNPC(float x,float y,String[] lines){
+    @Override public NPC createNPC(CoreGame game, float x,float y,String[] lines){
         return new NPC(x,y,lines);
     }
 }
