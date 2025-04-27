@@ -50,7 +50,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public void create() {
 
         batch = new SpriteBatch();
-        cam.setToOrtho(false, 16, 9);
+        cam.setToOrtho(false, 20, 11.25f);
 
         map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
         player = factory.createPlayer(this, cam, map, 8, 4.5f);
@@ -181,23 +181,19 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
 
     private void renderWorld() {
 
-        /* zemin + çarpışma katmanları */
-        map.renderBaseLayers(new int[]{0, 1});
-
-        /* çalı gölgesi */
-        if (player.isInBush()) map.renderBushWithShader(player, 50f);
-        else                    map.renderBushNoShader();
-
+        map.renderBase();                        // Ground + Building
+        map.renderBush(player, 50f, player.isInBush());
         /* goblin (ağaç altı) */
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
         goblins.forEach(g -> g.render(batch));
+        dynas.forEach(d -> d.render(batch));
+        barrels.forEach(b -> b.render(batch));
+        loot  .forEach(g -> g.render(batch));
         batch.end();
 
-        /* ağaç tepeleri */
-        if (map.isCellTreeTop((int) player.getX(), (int) player.getY()))
-            map.renderTreeTopWithShader(player, 90f);
-        else map.renderTreeTopNoShader();
+        map.renderTreeTop(player, 90f,
+            map.isCellTreeTop((int)player.getX(), (int)player.getY()));
 
         /* oyuncu + diğer varlıklar */
         batch.begin();

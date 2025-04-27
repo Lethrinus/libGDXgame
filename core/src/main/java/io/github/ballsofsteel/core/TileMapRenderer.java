@@ -2,199 +2,187 @@ package io.github.ballsofsteel.core;
 
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapObjects;
 import com.badlogic.gdx.maps.MapObject;
+import com.badlogic.gdx.maps.objects.PolygonMapObject;
 import com.badlogic.gdx.maps.tiled.*;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
-import com.badlogic.gdx.maps.tiled.TiledMapTileLayer.Cell;
-import com.badlogic.gdx.maps.tiled.TiledMapTile;
-import com.badlogic.gdx.maps.objects.PolygonMapObject;
 import com.badlogic.gdx.math.Intersector;
+import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector3;
 import io.github.ballsofsteel.entity.Player;
 
 /**
- * TileMapRenderer that:
- *  - Renders Ground/Collision/Bush/TreeTop layers
- *  - Applies a circle fade shader if needed
- *  - Provides collision (isCellBlocked), bush check (isCellBush), and tree top check (isCellTreeTop)
+ * Harita çizimi + çarpışma kontrolü.
+ *  • Katman adlarıyla çalışır (“Ground”, “Collision”, “TreeTop”, “Bush”).
+ *  • unitScale = 1 / tileWidth  -> harita pikseline otomatik uyar.
+ *  • Çarpışma SADECE “Collision” katmanındaki hücrelerde yapılır.
  */
 public class TileMapRenderer {
-    private TiledMap map;
-    private OrthogonalTiledMapRenderer renderer;
-    private OrthographicCamera camera;
 
-    private float mapWidth, mapHeight;
-    private final float unitScale = 1f / 48f;
+    /* -------- ayarlanabilir katman adları -------- */
+    private static final String LAYER_GROUND    = "Ground";
+    private static final String LAYER_COLLISION = "Collision";
+    private static final String LAYER_BUSH      = "Bush";
+    private static final String LAYER_TREETOP   = "TreeTop";
 
-    // Shader for Bush and TreeTop layers
+    private final TiledMap                   map;
+    private final OrthogonalTiledMapRenderer renderer;
+    private final OrthographicCamera         camera;
+
+    private final float unitScale;
+    private final float mapWidthTiles;
+    private final float mapHeightTiles;
+
+    /* opsiyonel shader */
     private com.badlogic.gdx.graphics.glutils.ShaderProgram circleShader;
 
-    public TileMapRenderer(OrthographicCamera camera, String mapPath) {
-        this.camera = camera;
-        TmxMapLoader loader = new TmxMapLoader();
-        map = loader.load(mapPath);
+    public TileMapRenderer(OrthographicCamera cam, String mapPath) {
 
-        // Read map dimensions from TMX properties (default 32 if missing)
-        if (map.getProperties().containsKey("width")) {
-            mapWidth = map.getProperties().get("width", Integer.class);
-        } else {
-            mapWidth = 32;
-        }
-        if (map.getProperties().containsKey("height")) {
-            mapHeight = map.getProperties().get("height", Integer.class);
-        } else {
-            mapHeight = 32;
-        }
+        camera = cam;
+        map    = new TmxMapLoader().load(mapPath);
+
+        /* tile boyutuna göre otomatik unitScale */
+        int tileW = map.getProperties().get("tilewidth" , Integer.class);
+        int tileH = map.getProperties().get("tileheight", Integer.class);
+        unitScale = 1f / tileW;                       // kare başına 1 dünya birimi
+
+        mapWidthTiles  = map.getProperties().get("width" , Integer.class);
+        mapHeightTiles = map.getProperties().get("height", Integer.class);
 
         renderer = new OrthogonalTiledMapRenderer(map, unitScale);
     }
 
-    public float getMapWidth() {
-        return mapWidth;
-    }
+    /* ------------------------------------------------------------------ */
+    /*  Getter’lar                                                         */
+    /* ------------------------------------------------------------------ */
+    public float getMapWidth () { return mapWidthTiles;  }  // dünya birimi
+    public float getMapHeight() { return mapHeightTiles; }
 
-    public float getMapHeight() {
-        return mapHeight;
-    }
-
-    public void renderBaseLayers(int[] layerIndices) {
+    /* ------------------------------------------------------------------ */
+    /*  Çizim (katman adlarıyla)                                          */
+    /* ------------------------------------------------------------------ */
+    public void renderBase() {                      // zemin + binalar
+        int[] idx = { layerIndex(LAYER_GROUND), layerIndex("Building") };
         renderer.setView(camera);
-        renderer.render(layerIndices);
+        renderer.render(idx);
     }
 
-    public void renderBushWithShader(Player player, float radius) {
-        if (map.getLayers().getCount() <= 2) return;
-        int[] layers = new int[]{2};
+    public void renderBush(Player p, float radius, boolean useShader){
+        Integer id = layerIndexSafe(LAYER_BUSH); if (id==null) return;
 
-        if (circleShader == null) {
+        renderer.setView(camera);
+        if (!useShader) { renderer.render(new int[]{id}); return; }
+
+        if (circleShader == null)
             circleShader = ShaderManager.createCircleShader();
-        }
-        Batch batch = renderer.getBatch();
-        batch.setShader(circleShader);
-        circleShader.bind();
 
-        // Convert player world pos to screen pos
-        Vector3 playerScreen = new Vector3(player.getX(), player.getY(), 0);
-        camera.project(playerScreen);
-        circleShader.setUniformf("u_playerScreenPos", playerScreen.x, playerScreen.y);
+        Batch b = renderer.getBatch();
+        b.setShader(circleShader); circleShader.bind();
+
+        Vector3 scr = new Vector3(p.getX(), p.getY(), 0);
+        camera.project(scr);
+        circleShader.setUniformf("u_playerScreenPos", scr.x, scr.y);
         circleShader.setUniformf("u_radius", radius);
 
-        renderer.setView(camera);
-        renderer.render(layers);
-        batch.setShader(null);
+        renderer.render(new int[]{id});
+        b.setShader(null);
     }
 
-    public void renderBushNoShader() {
-        if (map.getLayers().getCount() <= 2) return;
-        int[] layers = new int[]{2};
+    public void renderTreeTop(Player p, float radius, boolean useShader){
+        Integer id = layerIndexSafe(LAYER_TREETOP); if (id==null) return;
+
         renderer.setView(camera);
-        renderer.render(layers);
-    }
+        if (!useShader) { renderer.render(new int[]{id}); return; }
 
-    /**
-     * Renders the TreeTop layer with shader (radius in pixels).
-     */
-    public void renderTreeTopWithShader(Player player, float radius) {
-        if (map.getLayers().getCount() <= 3) return;
-        int[] layers = new int[]{3};
-
-        if (circleShader == null) {
+        if (circleShader == null)
             circleShader = ShaderManager.createCircleShader();
-        }
-        Batch batch = renderer.getBatch();
-        batch.setShader(circleShader);
-        circleShader.bind();
 
-        // Convert player world pos to screen pos
-        Vector3 playerScreen = new Vector3(player.getX(), player.getY(), 0);
-        camera.project(playerScreen);
-        circleShader.setUniformf("u_playerScreenPos", playerScreen.x, playerScreen.y);
+        Batch b = renderer.getBatch();
+        b.setShader(circleShader); circleShader.bind();
+
+        Vector3 scr = new Vector3(p.getX(), p.getY(), 0);
+        camera.project(scr);
+        circleShader.setUniformf("u_playerScreenPos", scr.x, scr.y);
         circleShader.setUniformf("u_radius", radius);
 
-        renderer.setView(camera);
-        renderer.render(layers);
-        batch.setShader(null);
+        renderer.render(new int[]{id});
+        b.setShader(null);
     }
 
-    /**
-     * Renders the TreeTop layer normally (no shader).
-     */
-    public void renderTreeTopNoShader() {
-        if (map.getLayers().getCount() <= 3) return;
-        int[] layers = new int[]{3};
-        renderer.setView(camera);
-        renderer.render(layers);
-    }
+    /* ------------------------------------------------------------------ */
+    /*  Çarpışma: SADECE “Collision” katmanı                              */
+    /* ------------------------------------------------------------------ */
+    public boolean isCellBlocked(int tileX, int tileY, Polygon polyWorld) {
 
-    /**
-     * Checks collision for tileX,tileY in Collision layer (index=1).
-     */
-    public boolean isCellBlocked(int tileX, int tileY, Polygon playerPoly) {
-        if (tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
+        if (tileX < 0 || tileY < 0
+            || tileX >= mapWidthTiles || tileY >= mapHeightTiles)
             return true;
-        }
-        TiledMapTileLayer collisionLayer = (TiledMapTileLayer) map.getLayers().get(0);
-        if (collisionLayer == null) return false;
 
-        Cell cell = collisionLayer.getCell(tileX, tileY);
-        if (cell == null) return false;
+        TiledMapTileLayer col = (TiledMapTileLayer) map.getLayers()
+            .get(LAYER_COLLISION);
+        if (col == null) return false;
 
-        TiledMapTile tile = cell.getTile();
-        if (tile == null) return false;
+        TiledMapTileLayer.Cell cell = col.getCell(tileX, tileY);
+        if (cell == null || cell.getTile() == null) return false;
 
-        MapObjects objects = tile.getObjects();
-        if (objects != null && objects.getCount() > 0) {
-            for (MapObject object : objects) {
-                if (object.getProperties().containsKey("blocked")) {
-                    if (object instanceof PolygonMapObject) {
-                        Polygon polygon = ((PolygonMapObject) object).getPolygon();
-                        float[] originalVerts = polygon.getTransformedVertices();
-                        Polygon tilePoly = new Polygon(originalVerts);
-                        tilePoly.setScale(unitScale, unitScale);
-                        tilePoly.setPosition(tileX, tileY);
+        MapObjects objs = cell.getTile().getObjects();
+        if (objs == null || objs.getCount() == 0) return false;
 
-                        if (Intersector.overlapConvexPolygons(tilePoly, playerPoly)) {
-                            return true;
-                        }
-                    } else {
-                        return true;
-                    }
-                }
-            }
+        /* Hücrede 'blocked' etiketi olan ilk nesne → çarpışma var */
+        for (MapObject o : objs) {
+            if (!o.getProperties().containsKey("blocked")) continue;
+
+            if (o instanceof PolygonMapObject) {
+                Polygon p = ((PolygonMapObject) o).getPolygon();
+                Polygon tilePoly = new Polygon(p.getTransformedVertices());
+                tilePoly.setScale(unitScale, unitScale);
+                tilePoly.setPosition(tileX, tileY);
+                if (Intersector.overlapConvexPolygons(tilePoly, polyWorld))
+                    return true;
+
+            } else return true;   // dikdörtgen vb. – ayrıntıya gerek yok
         }
         return false;
     }
 
-    /**
-     * Checks if the tile at (tileX, tileY) is bush tile (layer 2).
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Yardımcılar                                                        */
+    /* ------------------------------------------------------------------ */
+    private Integer layerIndexSafe(String name){
+        MapLayer l = map.getLayers().get(name);
+        if (l == null) return null;
+        return map.getLayers().getIndex(name);
+    }
+    private int layerIndex(String name){
+        MapLayer l = map.getLayers().get(name);
+        if (l == null)
+            throw new IllegalArgumentException("Katman bulunamadı: "+name);
+        return map.getLayers().getIndex(name);
+    }
+    /* ------------------------------------------------------------------ */
+    /*  Katman hücre sorguları (opsiyonel)                                */
+    /* ------------------------------------------------------------------ */
     public boolean isCellBush(int tileX, int tileY) {
-        if (tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
-            return false;
-        }
-        if (map.getLayers().getCount() <= 2) return false;
-        TiledMapTileLayer bushLayer = (TiledMapTileLayer) map.getLayers().get(2);
-        if (bushLayer == null) return false;
-
-        Cell cell = bushLayer.getCell(tileX, tileY);
-        return (cell != null && cell.getTile() != null);
+        return cellExists(LAYER_BUSH, tileX, tileY);
     }
 
-    /**
-     * Checks if the tile at (tileX, tileY) is tree top tile (layer 3).
-     */
     public boolean isCellTreeTop(int tileX, int tileY) {
-        if (tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
-            return false;
-        }
-        if (map.getLayers().getCount() <= 3) return false;
-        TiledMapTileLayer treeLayer = (TiledMapTileLayer) map.getLayers().get(3);
-        if (treeLayer == null) return false;
+        return cellExists(LAYER_TREETOP, tileX, tileY);
+    }
 
-        Cell cell = treeLayer.getCell(tileX, tileY);
-        return (cell != null && cell.getTile() != null);
+    private boolean cellExists(String layerName, int x, int y) {
+        MapLayer l = map.getLayers().get(layerName);
+        if (!(l instanceof TiledMapTileLayer)) return false;
+        TiledMapTileLayer tl = (TiledMapTileLayer) l;
+
+        if (x < 0 || y < 0 || x >= mapWidthTiles || y >= mapHeightTiles)
+            return false;
+
+        TiledMapTileLayer.Cell c = tl.getCell(x, y);
+        return c != null && c.getTile() != null;
     }
 
     public void dispose() {
