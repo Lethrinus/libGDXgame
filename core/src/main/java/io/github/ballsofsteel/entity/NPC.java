@@ -6,114 +6,84 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
-import io.github.ballsofsteel.core.CoreGame;
-import io.github.ballsofsteel.events.EventBus;
-import io.github.ballsofsteel.events.GameEvent;
-import io.github.ballsofsteel.events.GameEventType;
 
 /**
- * NPC class with an idle animation and a typewriter dialogue effect.
- * The idle animation is built from "Pawn/pawn_animations.png" using the region (2,2,1152,186)
- * split into 6 frames. Dialogue text is revealed gradually using a typewriter effect,
- * and is drawn with a Matrix4 transform (using the bubble’s center as the pivot) so that
- * it is properly centered within a custom speech bubble.
+ * NPC class with idle animation, typewriter dialogue effect, and player-centered pointer.
  */
 public class NPC {
 
     private float x, y;
     private float interactionRadius = 2.0f;
 
-    // Custom speech bubble texture (must be a PNG file in assets)
     private Texture bubbleTexture;
-    // BitmapFont for dialogue text
+    private Texture pointerTexture;
     private BitmapFont font;
 
-    // Dialogue lines and current state
     private String[] dialogues;
     private int currentLineIndex = 0;
     private boolean inDialogue = false;
 
-    // Typewriter effect variables
-    private float typedSpeed = 20f;   // Characters per second
-    private float typedTimer = 0f;    // Time counter
-    private int typedIndex = 0;       // Number of characters to show
+    private float typedSpeed = 20f;
+    private float typedTimer = 0f;
+    private int typedIndex = 0;
     private boolean typedComplete = false;
-    private String typedText = "";    // Current dialogue text
+    private String typedText = "";
 
-    // Speech bubble dimensions in world units
     private float bubbleWidth = 4f;
-    private float bubbleHeight = 1;
+    private float bubbleHeight = 1f;
 
-    // Idle animation for NPC (from pawn_animations.png)
     private Animation<TextureRegion> idleAnimation;
     private float stateTime = 0f;
-
-    // Pawn texture from which the idle animation is built
     private Texture pawnTexture;
 
     private float lastDistance = Float.MAX_VALUE;
-    private static boolean firstWaveStarted = false;
 
-    /**
-     * Constructs an NPC at position (x, y) with the given dialogue lines.
-     */
+    private static final float POINTER_DISTANCE = 1f;
+
+    private boolean firstWaveStarted = false;
+
     public NPC(float x, float y, String[] dialogues) {
         this.x = x;
         this.y = y;
         this.dialogues = dialogues;
 
-        // Load pawn texture and build idle animation from specified region:
-        // Region: x=2, y=2, width=1152, height=186; split horizontally into 6 frames (1152/6 = 192).
+        // Pawn idle animasyonu yükle
         pawnTexture = new Texture(Gdx.files.internal("Pawn/pawn_animations.png"));
         TextureRegion idleRegion = new TextureRegion(pawnTexture, 2, 2, 1152, 186);
         TextureRegion[][] tmp = idleRegion.split(192, 186);
-        idleAnimation = new Animation<TextureRegion>(0.2f, tmp[0]);
+        idleAnimation = new Animation<>(0.2f, tmp[0]);
         idleAnimation.setPlayMode(Animation.PlayMode.LOOP);
 
-        // Load custom bubble texture (bubble.png must exist in assets)
+        // Konuşma balonu
         bubbleTexture = new Texture(Gdx.files.internal("bubble.png"));
 
-        // Create a font using FreeTypeFontGenerator
+        // Pointer oku
+        pointerTexture = new Texture(Gdx.files.internal("HUD/npc_pointer.png"));
+
+        // Font oluştur
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/Homer_Simpson_Revised.ttf"));
         FreeTypeFontGenerator.FreeTypeFontParameter param = new FreeTypeFontGenerator.FreeTypeFontParameter();
         param.size = 82;
         param.color = Color.BLACK;
         param.borderWidth = 0.2f;
         param.borderColor = Color.WHITE;
-        param.borderStraight = false;
-        param.shadowOffsetX = 0;
-        param.shadowOffsetY = 0;
-        param.shadowColor = Color.CLEAR;
         this.font = generator.generateFont(param);
         generator.dispose();
-        // Use linear filtering for smoother scaling
-        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        // Set initial font scale (will be temporarily changed during dialogue rendering)
-        font.getData().setScale(1f);
 
-        inDialogue = false;
-        currentLineIndex = 0;
+        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        font.getData().setScale(1f);
     }
 
     public void update(float delta, Vector2 playerPos) {
-
         stateTime += delta;
         float dist = playerPos.dst(x, y);
         lastDistance = dist;
 
-        /* --- E tuşu --- */
         if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-
-            /* DALGA ARASI → doğrudan menü iste */
-            if (firstWaveStarted && io.github.ballsofsteel.core.WaveManager.isIntervalActive()) {
-                EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
-                return;
-            }
-
-            /* normal diyalog akışı */
             if (!inDialogue) {
                 inDialogue = true;
                 currentLineIndex = 0;
@@ -126,13 +96,7 @@ public class NPC {
                     currentLineIndex++;
                     if (currentLineIndex >= dialogues.length) {
                         inDialogue = false;
-
-                        if (!firstWaveStarted) {
-                            firstWaveStarted = true;
-                            EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
-                        } else {
-                            EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
-                        }
+                        firstWaveStarted = true; // diyaloğu bitir
                     } else {
                         startTypingEffect(dialogues[currentLineIndex]);
                     }
@@ -140,21 +104,16 @@ public class NPC {
             }
         }
 
-        /* typewriter güncelle */
         if (inDialogue && !typedComplete) {
             typedTimer += delta;
-            int show = (int)(typedTimer * typedSpeed);
+            int show = (int) (typedTimer * typedSpeed);
             int total = dialogues[currentLineIndex].length();
             if (show >= total) { show = total; typedComplete = true; }
             typedIndex = show;
-            typedText  = dialogues[currentLineIndex];
+            typedText = dialogues[currentLineIndex];
         }
     }
 
-
-    /**
-     * Initializes the typewriter effect for a new dialogue line.
-     */
     private void startTypingEffect(String line) {
         typedTimer = 0f;
         typedIndex = 0;
@@ -162,13 +121,8 @@ public class NPC {
         typedText = line;
     }
 
-    /**
-     * Renders the NPC's idle animation and, if dialogue is active, draws the speech bubble with
-     * the dialogue text using a Matrix4 transform for scaling.
-     * The text is centered within the bubble.
-     */
-    public void render(SpriteBatch batch) {
-        // Draw the NPC's idle animation (scaled down by converting from pixels to world units, 1/64)
+    public void render(SpriteBatch batch, Vector2 playerPos) {
+        // NPC sprite çizimi
         TextureRegion currentFrame = idleAnimation.getKeyFrame(stateTime, true);
         float spriteW = currentFrame.getRegionWidth() * (1f / 64f);
         float spriteH = currentFrame.getRegionHeight() * (1f / 64f);
@@ -176,56 +130,75 @@ public class NPC {
         float drawY = y - spriteH / 2f;
         batch.draw(currentFrame, drawX, drawY, spriteW, spriteH);
 
+        float dx = x - playerPos.x;
+        float dy = y - playerPos.y;
+        float distToPlayer = (float)Math.sqrt(dx * dx + dy * dy);
+
+        if (distToPlayer > 4f) { // NPC çok uzaktaysa göster
+            float angleDeg = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
+
+            float dirX = MathUtils.cosDeg(angleDeg);
+            float dirY = MathUtils.sinDeg(angleDeg);
+
+            float pointerX = playerPos.x + dirX * POINTER_DISTANCE;
+            float pointerY = playerPos.y + dirY * POINTER_DISTANCE;
+
+            float pointerW = pointerTexture.getWidth() * (1f / 48f);
+            float pointerH = pointerTexture.getHeight() * (1f / 48f);
+
+            float alpha = MathUtils.clamp((distToPlayer - 4f) / 6f, 0f, 1f);
+
+
+            float pulse = 1f + 0.05f * MathUtils.sin(stateTime * 3f);
+
+            batch.setColor(1f, 1f, 1f, alpha);
+            batch.draw(pointerTexture,
+                pointerX - pointerW / 2f, pointerY - pointerH / 2f,
+                pointerW / 2f, pointerH / 2f,
+                pointerW, pointerH,
+                pulse, pulse,  // Burada scale'ı pulse yapıyoruz
+                angleDeg - 90f,
+                0, 0,
+                pointerTexture.getWidth(), pointerTexture.getHeight(),
+                false, false
+            );
+            batch.setColor(1f, 1f, 1f, 1f);
+        }
         if (!inDialogue || lastDistance > interactionRadius) return;
 
-        if (!inDialogue) return;
-
-        // Draw the speech bubble
+        // Konuşma balonu çizimi
         float bubbleX = x - bubbleWidth * 0.5f;
-        float bubbleY = y + 1.0f;  // Adjust as needed for proper positioning above the NPC
+        float bubbleY = y + 1.0f;
         batch.draw(bubbleTexture, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
 
-        // Compute the center of the bubble (pivot for scaling)
         float centerX = bubbleX + bubbleWidth / 2f;
         float centerY = bubbleY + bubbleHeight / 2f;
-
-        // Calculate the effective wrap width in pixels (assuming 32 px per world unit)
         float bubblePixelWidth = bubbleWidth * 256f;
         float marginPixels = 16f;
         float wrapWidth = bubblePixelWidth - marginPixels;
 
-        // Get the visible text from the typewriter effect
         String visibleText = typedText.substring(0, Math.min(typedIndex, typedText.length()));
 
-        // Create a GlyphLayout with center alignment
         GlyphLayout layout = new GlyphLayout();
         layout.setText(font, visibleText, Color.BLACK, wrapWidth, Align.left, true);
 
-        // Save the current transform matrix
         Matrix4 oldTransform = batch.getTransformMatrix().cpy();
-
-        // Create a new transform that scales relative to the bubble's center
-        float textScale = 0.005f;  // Adjust this value if needed
+        float textScale = 0.005f;
         Matrix4 transform = new Matrix4();
         transform.translate(centerX, centerY, 0);
         transform.scale(textScale, textScale, 1);
         transform.translate(-centerX, -centerY, 0);
         batch.setTransformMatrix(transform);
 
-        // Draw the text centered at the bubble's center (adjust by half layout width/height in pixels)
-        // Note: font.draw expects pixel coordinates, but our transform scales accordingly.
         font.draw(batch, layout, centerX - layout.width / 2, centerY + layout.height / 2);
 
-        // Restore the original transform matrix
         batch.setTransformMatrix(oldTransform);
     }
 
-    /**
-     * Disposes of the NPC's resources.
-     */
     public void dispose() {
         bubbleTexture.dispose();
         pawnTexture.dispose();
+        pointerTexture.dispose();
         font.dispose();
     }
 

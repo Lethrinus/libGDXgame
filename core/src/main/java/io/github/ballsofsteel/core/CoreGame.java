@@ -198,10 +198,10 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         /* oyuncu + diğer varlıklar */
         batch.begin();
         player.render(batch);
-        npc.render(batch);
+        npc.render(batch, new Vector2(player.getX(), player.getY()));
         barrels.forEach(b -> b.render(batch));
-        dynas  .forEach(d -> d.render(batch));
-        loot   .forEach(g -> g.render(batch));
+        dynas.forEach(d -> d.render(batch));
+        loot.forEach(g -> g.render(batch));
         batch.end();
     }
 

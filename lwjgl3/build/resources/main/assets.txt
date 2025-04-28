@@ -10,6 +10,7 @@ HUD/cursor.png
 HUD/gold_bag.png
 HUD/inventory_bg.png
 HUD/meat.png
+HUD/npc_pointer.png
 HUD/slot_normal.png
 HUD/slot_selected.png
 Pawn/pawn_animations.atlas

@@ -128,20 +128,29 @@ public class Goblin {
 
             case MOVE:
                 if (dist < ATTACK_RADIUS && attackCD <= 0f) {
-                    st = ST.ATTACK; atkT = 0f; attackDone = false;
-                } else {
+
+                    st = ST.ATTACK;
+                    atkT = 0f;
+                    attackDone = false;
+                } else if (dist > ATTACK_RADIUS * 0.8f) {
+
                     float moveX = x + (dx / dist) * SPEED * dt;
                     float moveY = y + (dy / dist) * SPEED * dt;
+                    float newDx = player.getX() - moveX;
+                    float newDy = player.getY() - moveY;
+                    float newDist = (float)Math.sqrt(newDx*newDx + newDy*newDy);
 
-                    if (canMoveTo(moveX, moveY)) {
-                        x = moveX;
-                        y = moveY;
+                    if (newDist > ATTACK_RADIUS * 0.8f) {
+
+                        if (canMoveTo(moveX, moveY)) {
+                            x = moveX;
+                            y = moveY;
+                        }
                     }
                     facingRight = dx > 0;
                 }
                 moveT += dt;
                 break;
-
             case ATTACK:
                 atkT += dt;
                 if (!attackDone && atkT >= ATTACK_HIT_T){
