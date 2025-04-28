@@ -350,31 +350,31 @@ public class Player {
             attackStateTime += delta;
 
             if (!attackExecuted && attackStateTime >= attackHitTime) {
-                /* -- Dinamitçiler */
+
+                // dynamite
+                boolean hitSomething = false;
                 for (DynamiteGoblin dg : core.getDynaList()) {
-                    float ddx = dg.getX() - x, ddy = dg.getY() - y;      // ← isimler değiştirildi
-                    if (ddx*ddx + ddy*ddy <= attackRange*attackRange) {
+                    float ddx = dg.getX() - x, ddy = dg.getY() - y;
+                    if (ddx * ddx + ddy * ddy <= attackRange * attackRange) {
                         float ang = MathUtils.atan2(ddy, ddx) * MathUtils.radiansToDegrees;
                         dg.takeDamage(attackDamage, attackKnockbackForce, ang);
-                        attackExecuted = true;
+                        hitSomething = true;
                     }
                 }
 
-                /* -- Ana Goblin */
-                /* -------- goblinler -------- */
-                if(!attackExecuted){
-                    for(Goblin g : core.getGoblins()){
-                        float gx=g.getX()-x, gy=g.getY()-y;
-                        if(gx*gx+gy*gy <= attackRange*attackRange){
-                            float ang = MathUtils.atan2(gy,gx)*MathUtils.radiansToDegrees;
-                            g.takeDamage(attackDamage, attackKnockbackForce, ang);
-                            attackExecuted = true;   // tek darbe → tek goblin
-                            break;
-                        }
+                //normal goblin
+                for (Goblin g : core.getGoblins()) {
+                    float gx = g.getX() - x, gy = g.getY() - y;
+                    if (gx * gx + gy * gy <= attackRange * attackRange) {
+                        float ang = MathUtils.atan2(gy, gx) * MathUtils.radiansToDegrees;
+                        g.takeDamage(attackDamage, attackKnockbackForce, ang);
+                        hitSomething = true;
                     }
                 }
 
+                if (hitSomething) attackExecuted = true;
             }
+
             if (attackStateTime >= attackDuration) isAttacking = false;
         }
          else {

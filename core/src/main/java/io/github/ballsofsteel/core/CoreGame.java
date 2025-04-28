@@ -50,7 +50,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public void create() {
 
         batch = new SpriteBatch();
-        cam.setToOrtho(false, 44, 44f);
+        cam.setToOrtho(false, 21, 12.35f);
 
         map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
         player = factory.createPlayer(this, cam, map, 15, 15);
