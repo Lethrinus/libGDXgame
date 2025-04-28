@@ -51,6 +51,10 @@ public class DynamiteGoblin {
     private static final float THROW_COOLDOWN = 1.2f;   // eski değeri ~0.8
 
 
+    private static final Vector2 BRIDGE_TARGET = new Vector2(31.5f, 29.5f);
+    private boolean reachedBridge = false;
+
+
     /* ───────── referanslar ───────── */
     private final Player player;
     private final List<DynamiteGoblin> crowd;
@@ -72,55 +76,60 @@ public class DynamiteGoblin {
                           float sx,float sy){
         player=p; crowd=same; this.loot=loot; x=sx; y=sy;
     }
+    private Vector2 getTargetPosition() {
+        if (player.getY() > 32f && !reachedBridge) {
+            return BRIDGE_TARGET;
+        }
+        return new Vector2(player.getX(), player.getY());
+    }
 
     /* ───────── ana update ───────── */
-    public void update(float dt){
-        bombs.removeIf(b->b.update(dt));
-        if (throwCD>0) throwCD-=dt;
-        if(st==ST.DIE){ tState+=dt; return; }
+    public void update(float dt) {
+        bombs.removeIf(b -> b.update(dt));
+        if (throwCD > 0) throwCD -= dt;
+        if (st == ST.DIE) { tState += dt; return; }
 
-        /* basit separation */
-        for(DynamiteGoblin g:crowd){
-            if(g==this || g.st==ST.DIE) continue;
-            float dx=x-g.x, dy=y-g.y, d2=dx*dx+dy*dy;
-            if(d2<.4f){
-                float d=(float)Math.sqrt(d2);
-                x+=dx/d*dt*1.5f; y+=dy/d*dt*1.5f;
+        for (DynamiteGoblin g : crowd) {
+            if (g != this && g.st != ST.DIE) {
+                float dx = x - g.x, dy = y - g.y;
+                if (dx * dx + dy * dy < .4f) {
+                    float d = (float) Math.sqrt(dx * dx + dy * dy);
+                    x += dx / d * dt * 1.5f;
+                    y += dy / d * dt * 1.5f;
+                }
             }
         }
 
-        float dx = player.getX()-x, dy = player.getY()-y;
-        float dist = (float)Math.sqrt(dx*dx+dy*dy);
+        Vector2 target = getTargetPosition();
+        float dx = target.x - x, dy = target.y - y;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy);
 
-        if(st==ST.THROW){
-            tThrow+=dt;
-            if(!released && tThrow>=.32f){
-                bombs.add(new Dynamite(x,y, dx/dist*3.5f, dy/dist*3.5f));
-                released=true;
+        if (!reachedBridge && BRIDGE_TARGET.dst2(x, y) < 1f) reachedBridge = true;
+
+        if (st == ST.THROW) {
+            tThrow += dt;
+            if (!released && tThrow >= .32f) {
+                bombs.add(new Dynamite(x, y, dx / dist * 3.5f, dy / dist * 3.5f));
+                released = true;
             }
-            if(tThrow>=throwR.getAnimationDuration()) st=ST.MOVE;
-        }else{
-            // MOVE
-            if(dist<KEEP_DIST){             // kaç – uzaklaş
-                x-=dx/dist*dt*2f; y-=dy/dist*dt*2f;
-            }else if(dist>THROW_DIST){      // yaklaş
-                x+=dx/dist*dt*1.7f; y+=dy/dist*dt*1.7f;
-            }else{                          // atış mesafesi
-                if(throwCD <= 0f)  {
-                    st = ST.THROW;
-                 tThrow=0; released=false;
-                throwCD = THROW_COOLDOWN;}
+            if (tThrow >= .5f) st = ST.MOVE;
+        } else {
+            if (dist < 2.8f) { x -= dx / dist * dt * 2f; y -= dy / dist * dt * 2f; }
+            else if (dist > 4.2f) { x += dx / dist * dt * 1.7f; y += dy / dist * dt * 1.7f; }
+            else {
+                if (throwCD <= 0f) {
+                    st = ST.THROW; tThrow = 0; released = false;
+                    throwCD = 1.2f;
+                }
             }
         }
 
-        /* knock-back sönümü */
-        if(knock.len2()>.0001f){
-            x+=knock.x*dt; y+=knock.y*dt;
-            knock.scl(1-dt*4f);
+        if (knock.len2() > .0001f) {
+            x += knock.x * dt; y += knock.y * dt;
+            knock.scl(1 - dt * 4f);
         }
-
         if(flashTimer>0) flashTimer-=dt;
-        tState+=dt;
+        tState += dt;
     }
 
     /* ───────── render ───────── */

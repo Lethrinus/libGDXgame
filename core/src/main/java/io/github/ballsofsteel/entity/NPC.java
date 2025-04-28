@@ -10,6 +10,10 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
+import io.github.ballsofsteel.core.CoreGame;
+import io.github.ballsofsteel.events.EventBus;
+import io.github.ballsofsteel.events.GameEvent;
+import io.github.ballsofsteel.events.GameEventType;
 
 /**
  * NPC class with idle animation, typewriter dialogue effect, and player-centered pointer.
@@ -37,34 +41,27 @@ public class NPC {
     private float bubbleHeight = 1f;
 
     private Animation<TextureRegion> idleAnimation;
-    private float stateTime = 0f;
     private Texture pawnTexture;
+    private float stateTime = 0f;
 
     private float lastDistance = Float.MAX_VALUE;
-
     private static final float POINTER_DISTANCE = 1f;
-
-    private boolean firstWaveStarted = false;
+    private static boolean firstWaveStarted = false;
 
     public NPC(float x, float y, String[] dialogues) {
         this.x = x;
         this.y = y;
         this.dialogues = dialogues;
 
-        // Pawn idle animasyonu yükle
         pawnTexture = new Texture(Gdx.files.internal("Pawn/pawn_animations.png"));
         TextureRegion idleRegion = new TextureRegion(pawnTexture, 2, 2, 1152, 186);
         TextureRegion[][] tmp = idleRegion.split(192, 186);
         idleAnimation = new Animation<>(0.2f, tmp[0]);
         idleAnimation.setPlayMode(Animation.PlayMode.LOOP);
 
-        // Konuşma balonu
         bubbleTexture = new Texture(Gdx.files.internal("bubble.png"));
-
-        // Pointer oku
         pointerTexture = new Texture(Gdx.files.internal("HUD/npc_pointer.png"));
 
-        // Font oluştur
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/Homer_Simpson_Revised.ttf"));
         FreeTypeFontGenerator.FreeTypeFontParameter param = new FreeTypeFontGenerator.FreeTypeFontParameter();
         param.size = 82;
@@ -84,6 +81,11 @@ public class NPC {
         lastDistance = dist;
 
         if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            if (firstWaveStarted && isIntervalActive()) {
+                EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
+                return;
+            }
+
             if (!inDialogue) {
                 inDialogue = true;
                 currentLineIndex = 0;
@@ -96,7 +98,12 @@ public class NPC {
                     currentLineIndex++;
                     if (currentLineIndex >= dialogues.length) {
                         inDialogue = false;
-                        firstWaveStarted = true; // diyaloğu bitir
+                        if (!firstWaveStarted) {
+                            firstWaveStarted = true;
+                            EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
+                        } else {
+                            EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
+                        }
                     } else {
                         startTypingEffect(dialogues[currentLineIndex]);
                     }
@@ -106,7 +113,7 @@ public class NPC {
 
         if (inDialogue && !typedComplete) {
             typedTimer += delta;
-            int show = (int) (typedTimer * typedSpeed);
+            int show = (int)(typedTimer * typedSpeed);
             int total = dialogues[currentLineIndex].length();
             if (show >= total) { show = total; typedComplete = true; }
             typedIndex = show;
@@ -122,21 +129,17 @@ public class NPC {
     }
 
     public void render(SpriteBatch batch, Vector2 playerPos) {
-        // NPC sprite çizimi
         TextureRegion currentFrame = idleAnimation.getKeyFrame(stateTime, true);
         float spriteW = currentFrame.getRegionWidth() * (1f / 64f);
         float spriteH = currentFrame.getRegionHeight() * (1f / 64f);
-        float drawX = x - spriteW / 2f;
-        float drawY = y - spriteH / 2f;
-        batch.draw(currentFrame, drawX, drawY, spriteW, spriteH);
+        batch.draw(currentFrame, x - spriteW / 2f, y - spriteH / 2f, spriteW, spriteH);
 
         float dx = x - playerPos.x;
         float dy = y - playerPos.y;
         float distToPlayer = (float)Math.sqrt(dx * dx + dy * dy);
 
-        if (distToPlayer > 4f) { // NPC çok uzaktaysa göster
+        if (distToPlayer > 4f) {
             float angleDeg = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-
             float dirX = MathUtils.cosDeg(angleDeg);
             float dirY = MathUtils.sinDeg(angleDeg);
 
@@ -147,8 +150,6 @@ public class NPC {
             float pointerH = pointerTexture.getHeight() * (1f / 48f);
 
             float alpha = MathUtils.clamp((distToPlayer - 4f) / 6f, 0f, 1f);
-
-
             float pulse = 1f + 0.05f * MathUtils.sin(stateTime * 3f);
 
             batch.setColor(1f, 1f, 1f, alpha);
@@ -156,7 +157,7 @@ public class NPC {
                 pointerX - pointerW / 2f, pointerY - pointerH / 2f,
                 pointerW / 2f, pointerH / 2f,
                 pointerW, pointerH,
-                pulse, pulse,  // Burada scale'ı pulse yapıyoruz
+                pulse, pulse,
                 angleDeg - 90f,
                 0, 0,
                 pointerTexture.getWidth(), pointerTexture.getHeight(),
@@ -164,9 +165,9 @@ public class NPC {
             );
             batch.setColor(1f, 1f, 1f, 1f);
         }
+
         if (!inDialogue || lastDistance > interactionRadius) return;
 
-        // Konuşma balonu çizimi
         float bubbleX = x - bubbleWidth * 0.5f;
         float bubbleY = y + 1.0f;
         batch.draw(bubbleTexture, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
@@ -183,15 +184,13 @@ public class NPC {
         layout.setText(font, visibleText, Color.BLACK, wrapWidth, Align.left, true);
 
         Matrix4 oldTransform = batch.getTransformMatrix().cpy();
-        float textScale = 0.005f;
         Matrix4 transform = new Matrix4();
         transform.translate(centerX, centerY, 0);
-        transform.scale(textScale, textScale, 1);
+        transform.scale(0.005f, 0.005f, 1);
         transform.translate(-centerX, -centerY, 0);
         batch.setTransformMatrix(transform);
 
         font.draw(batch, layout, centerX - layout.width / 2, centerY + layout.height / 2);
-
         batch.setTransformMatrix(oldTransform);
     }
 
@@ -204,4 +203,9 @@ public class NPC {
 
     public float getX() { return x; }
     public float getY() { return y; }
+
+    private boolean isIntervalActive() {
+
+        return false;
+    }
 }

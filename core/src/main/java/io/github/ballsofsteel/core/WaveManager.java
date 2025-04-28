@@ -28,7 +28,7 @@ public final class WaveManager implements GameEventListener {
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
     private final List<WaveSpec> waves = Arrays.asList(
-            new WaveSpec(22,  0, 0),
+            new WaveSpec(12,  15, 3),
             new WaveSpec(12,  4, 0),
             new WaveSpec(14,  5, 3),
             new WaveSpec(18, 10, 6)

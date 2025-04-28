@@ -28,6 +28,7 @@ fonts/Homer_Simpson_Revised.ttf
 libgdx.png
 maps/GoldMine_Active.tsx
 maps/Tilesets/Bridge.tsx
+maps/Tilesets/BridgeLarge.tsx
 maps/Tilesets/Bush.tsx
 maps/Tilesets/Bush2.tsx
 maps/Tilesets/Castle.tsx
@@ -59,6 +60,7 @@ maps/Tilesets/Images/16.png
 maps/Tilesets/Images/17.png
 maps/Tilesets/Images/18.png
 maps/Tilesets/Images/Bridge.png
+maps/Tilesets/Images/BridgeLarge.png
 maps/Tilesets/Images/Bridge_All.png
 maps/Tilesets/Images/Bush.png
 maps/Tilesets/Images/Castle_Blue.png
