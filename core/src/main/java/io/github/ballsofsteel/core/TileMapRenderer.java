@@ -28,6 +28,7 @@ public class TileMapRenderer {
     private static final String LAYER_BUSH      = "Bush";
     private static final String LAYER_BUILDINGS = "Building";
     private static final String LAYER_TREETOP   = "TreeTop";
+    private static final String LAYER_PATHBLOCKER = "PathBlocker";
     private static final String LAYER_WATER = "Water";
 
     private final TiledMap                   map;
@@ -42,6 +43,7 @@ public class TileMapRenderer {
     private final int buildingLayerIndex;
     private final int waterLayerIndex;
     private final int treeTopLayerIndex;
+    private final int pathBlockerIndex;
     private final int collisionLayerIndex;
 
 
@@ -68,7 +70,7 @@ public class TileMapRenderer {
         waterLayerIndex = layerIndex(LAYER_WATER);
         treeTopLayerIndex = layerIndex(LAYER_TREETOP);
         collisionLayerIndex = layerIndex(LAYER_COLLISION);
-
+        pathBlockerIndex = layerIndex(LAYER_PATHBLOCKER);
     }
 
     /* ------------------------------------------------------------------ */
@@ -81,7 +83,7 @@ public class TileMapRenderer {
     /*  Çizim (katman adlarıyla)                                          */
     /* ------------------------------------------------------------------ */
     public void renderBase() {                      // zemin + binalar
-        int[] idx = { waterLayerIndex, groundLayerIndex, collisionLayerIndex, buildingLayerIndex, treeTopLayerIndex};
+        int[] idx = { waterLayerIndex,pathBlockerIndex, groundLayerIndex, collisionLayerIndex, buildingLayerIndex, treeTopLayerIndex};
         renderer.setView(camera);
         renderer.render(idx);
     }

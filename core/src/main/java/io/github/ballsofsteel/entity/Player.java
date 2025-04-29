@@ -441,14 +441,34 @@ public class Player {
             }
         }
 
-        // Apply knockback.
         if (knockback.len() > 0.01f) {
-            x += knockback.x * delta;
-            y += knockback.y * delta;
+            float nx = x + knockback.x * delta;
+            float ny = y + knockback.y * delta;
+
+            // Build a small rectangle at the would-be position
+            Rectangle rect = new Rectangle(
+                nx - COLLISION_W/2f,
+                ny - COLLISION_H/2f,
+                COLLISION_W,
+                COLLISION_H
+            );
+            Polygon poly = createRectanglePolygon(rect);
+
+            // Only move if that cell isn't blocked
+            if (!tileMapRenderer.isCellBlocked((int)Math.floor(nx), (int)Math.floor(ny), poly)) {
+                x = nx;
+                y = ny;
+            } else {
+                // Hitting a wall or water stops further knockback
+                knockback.set(0, 0);
+            }
+
+            // Decay the knockback vector as before
             knockback.scl(1 - knockbackDecay * delta);
             if (knockback.len() < 0.01f) {
                 knockback.set(0, 0);
             }
+
         }
         movementStateTime += delta;
         if (redFlashTimer > 0) redFlashTimer -= delta;

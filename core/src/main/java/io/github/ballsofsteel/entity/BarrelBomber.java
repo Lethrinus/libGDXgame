@@ -4,159 +4,135 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.core.CoreGame;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class BarrelBomber {
+/** Varil bombacısı – artık vurulamaz; yalnızca patlar. */
+public class BarrelBomber extends BaseEnemy {
 
-    /* ---------- statik animasyonlar ---------- */
+    /* sprite & animasyon ------------------------------------------------ */
     private static final Texture SHEET = new Texture(Gdx.files.internal("Goblin/barrel_atlas.png"));
     private static final Texture BOOM  = new Texture(Gdx.files.internal("Dynamite/explosions_dynamite.png"));
-
-    private static final Animation<TextureRegion> runR, runL, prepareExplodeA, explodeA;
+    private static final Animation<TextureRegion>
+        runR, runL, prepareA, explodeA;
     static {
         SHEET.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-        BOOM.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-        runR            = row(SHEET, 2, 2, 768, 128, 6, .10f);
-        runL            = mirror(runR);
-        prepareExplodeA = row(SHEET, 2, 262, 384, 128, 3, .2f);
-        explodeA        = row(BOOM , 2, 68, 1728, 192, 9, .07f);
+        BOOM .setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        runR     = BaseEnemy.row(SHEET, 2,   2, 768,128,6,.10f);
+        runL     = BaseEnemy.mirror(runR);
+        prepareA = BaseEnemy.row(SHEET, 2, 262, 384,128,3,.20f);
+        explodeA = BaseEnemy.row(BOOM , 2,  68,1728,192,9,.07f);
     }
 
-    private static Animation<TextureRegion> row(Texture t, int x, int y, int w, int h, int n, float d) {
-        return new Animation<>(d, new TextureRegion(t, x, y, w, h).split(w / n, h)[0]);
-    }
+    /* sabitler ----------------------------------------------------------- */
+    private static final float SCALE          = 1f/72f;
+    private static final float SPEED          = 1.7f;
+    private static final float SEPARATE_DIST2 = .45f*.45f*4f;
+    private static final float SEPARATE_SPEED = 1.5f;
+    private static final float DAMAGE_RADIUS  = 2f;
+    private static final float PREP_DIST      = 1.3f;
 
-    private static Animation<TextureRegion> mirror(Animation<TextureRegion> src) {
-        TextureRegion[] original = src.getKeyFrames();
-        TextureRegion[] mirrored = new TextureRegion[original.length];
-        for (int i = 0; i < original.length; i++) {
-            mirrored[i] = new TextureRegion(original[i]);
-            mirrored[i].flip(true, false);
-        }
-        return new Animation<>(src.getFrameDuration(), mirrored);
-    }
-
-    /* ---------- sabitler ---------- */
-    private static final float SCALE = 1f / 72f;
-    private static final float RADIUS = .45f;
-    private static final float DAMAGE_RADIUS = 2f;
-
-    /* ---------- referanslar ve state ---------- */
+    /* referans / state --------------------------------------------------- */
     private final Player player;
+    private final CoreGame core;
     private final List<BarrelBomber> crowd;
-    private CoreGame core;
-    private float x, y, baseY, hop;
-    private float t, preBoomT, boomT;
-    private boolean preparing, exploding, finished, facingLeft;
-    private boolean damageApplied;
 
-    public BarrelBomber(Player player, CoreGame core, List<BarrelBomber> crowd, float startX, float startY) {
-        this.player = player;
-        this.core = core;
-        this.crowd = crowd;
-        this.x = startX;
-        this.baseY = this.y = startY;
+    private boolean preparing=false, exploding=false, finished=false, facingLeft;
+    private float tAnim=0f, preT=0f, boomT=0f;
+    private boolean damageApplied=false;
+    private float baseY, hop;
+
+    /* A* verisi */
+    private List<Vector2> path=new ArrayList<>();
+    private int   pathIdx=0;   private float pathTimer=0;
+    private static final float REPLAN=.5f;
+
+    public BarrelBomber(Player pl, CoreGame core,
+                        List<BarrelBomber> crowd,
+                        float sx,float sy){
+        super(sx, sy, 1f, core.getMap());
+
+        this.player=pl; this.core=core; this.crowd=crowd;
+        baseY=sy;
     }
 
-    public void update(float dt) {
-        if (preparing) {
-            preBoomT += dt;
-            if (prepareExplodeA.isAnimationFinished(preBoomT)) {
-                preparing = false;
-                exploding = true;
-                boomT = 0;
+    /* update ------------------------------------------------------------- */
+    public void update(float dt){
 
-                if (core != null) {
-                    core.getCameraShake().shake(0.4f, 0.2f);
-                }
+        baseUpdate(dt);          // sadece knock-back (vurulamasa da)
+
+        if(preparing){ preT+=dt; if(prepareA.isAnimationFinished(preT)){
+            preparing=false; exploding=true; boomT=0;
+            core.getCameraShake().shake(.4f,.2f);
+        } return; }
+
+        if(exploding){ boomT+=dt;
+            if(!damageApplied && boomT>=explodeA.getAnimationDuration()/3f){
+                float dx=player.getX()-x, dy=player.getY()-baseY;
+                if(dx*dx+dy*dy<DAMAGE_RADIUS*DAMAGE_RADIUS){
+                    float ang=MathUtils.atan2(dy,dx)*MathUtils.radiansToDegrees;
+                    player.takeDamage(35f,6f,ang);
+                } damageApplied=true;
             }
+            if(explodeA.isAnimationFinished(boomT)) finished=true;
             return;
         }
 
-        if (exploding) {
-            boomT += dt;
+        /* separation */
+        separateFromCrowd(crowd, SEPARATE_DIST2, SEPARATE_SPEED, dt);
 
-            if (!damageApplied && boomT >= explodeA.getAnimationDuration() / 3f) {
-                float dx = player.getX() - x;
-                float dy = player.getY() - baseY;
-                float dist = (float) Math.sqrt(dx * dx + dy * dy);
-                if (dist < DAMAGE_RADIUS) {
-                    float angle = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
-                    player.takeDamage(35f, 6f, angle);
-                }
-                damageApplied = true;
-            }
-
-            if (explodeA.isAnimationFinished(boomT)) {
-                finished = true;
-
-            }
-            return;
+        /* A* yol bul + hareket */
+        pathTimer-=dt;
+        if(pathTimer<=0||pathIdx>=path.size()){
+            path=findPath(core.getMap(),
+                (int)Math.floor(x),(int)Math.floor(baseY),
+                (int)Math.floor(player.getX()),
+                (int)Math.floor(player.getY()));
+            pathIdx=0; pathTimer=REPLAN;
         }
-
-        /* ---------- birbirinden uzaklaştırma ---------- */
-        for (BarrelBomber b : crowd) {
-            if (b == this || b.exploding || b.preparing) continue;
-            float dx = x - b.x, dy = baseY - b.baseY;
-            float d2 = dx * dx + dy * dy;
-            if (d2 < RADIUS * RADIUS * 4) {
-                float d = (float) Math.sqrt(d2);
-                if (d > 0) {
-                    x += dx / d * dt * 1.5f;
-                    baseY += dy / d * dt * 1.5f;
-                }
+        if(pathIdx<path.size()){
+            Vector2 g=path.get(pathIdx);
+            float gx=g.x-x, gy=g.y-baseY;
+            float gd=(float)Math.sqrt(gx*gx+gy*gy);
+            if(gd<.1f) pathIdx++;
+            else{
+                float mv=SPEED*dt;
+                float nx=x+(gx/gd)*mv, ny=baseY+(gy/gd)*mv;
+                if(canMoveTo(core.getMap(),nx,ny)){ x=nx; baseY=ny; }
             }
         }
 
-        /* ---------- oyuncuya doğru koş ve şişmeye başla ---------- */
-        float dx = player.getX() - x;
-        float dy = player.getY() - baseY;
-        float dist = (float) Math.sqrt(dx * dx + dy * dy);
-        facingLeft = dx < 0;
+        /* yaklaştıysa patlamaya hazırlan */
+        float dx=player.getX()-x, dy=player.getY()-baseY;
+        facingLeft = dx<0;
+        if(Math.sqrt(dx*dx+dy*dy)<PREP_DIST){ preparing=true; preT=0; }
 
-        if (dist > 1.3f) {
-            x += dx / dist * dt * 1.7f;
-            baseY += dy / dist * dt * 1.7f;
-        } else {
-            preparing = true;
-            preBoomT = 0;
-        }
-
-        t += dt;
-        hop = Math.abs(MathUtils.sin(t * 3f)) * 0.35f;
+        /* hop hareketi */
+        tAnim+=dt; hop=Math.abs(MathUtils.sin(tAnim*3f))*0.35f;
     }
 
-    public void render(SpriteBatch batch) {
-        TextureRegion frame;
-        if (preparing) {
-            frame = prepareExplodeA.getKeyFrame(preBoomT, false);
-            draw(batch, frame, 1f);
-        } else if (exploding) {
-            frame = explodeA.getKeyFrame(boomT, false);
-            draw(batch, frame, 1f);
-        } else {
-            frame = (facingLeft ? runL : runR).getKeyFrame(t, true);
-            draw(batch, frame, 1f, hop);
+    /* render ------------------------------------------------------------- */
+    public void render(SpriteBatch b){
+        TextureRegion fr =
+            preparing ? prepareA.getKeyFrame(preT,false)
+                : exploding ? explodeA.getKeyFrame(boomT,false)
+                : (facingLeft?runL:runR).getKeyFrame(tAnim,true);
+        float w=fr.getRegionWidth()*SCALE, h=fr.getRegionHeight()*SCALE;
+        b.draw(fr,x-w/2f, baseY+hop-h/2f, w,h);
+
+        if(flashTimer>0&&!exploding&&!preparing){
+            b.setColor(1,0,0,0.3f); b.draw(fr,x-w/2f,baseY+hop-h/2f,w,h); b.setColor(1,1,1,1);
         }
     }
 
-    private void draw(SpriteBatch batch, TextureRegion frame, float scale) {
-        draw(batch, frame, scale, 0);
-    }
+    /* vurulamaz ---------------------------------------------------------- */
 
-    private void draw(SpriteBatch batch, TextureRegion frame, float scale, float yOffset) {
-        float width = frame.getRegionWidth() * scale * SCALE;
-        float height = frame.getRegionHeight() * scale * SCALE;
-        batch.draw(frame, x - width / 2f, baseY + yOffset - height / 2f, width, height);
-    }
 
-    public boolean isFinished() {
-        return finished;
-    }
-
-    public void dispose() {
-    }
+    @Override public boolean isDead ()  { return finished; }
+    @Override public boolean isDying()  { return false;    }
+    public boolean isFinished(){ return finished; }
+    public void dispose(){}
 }

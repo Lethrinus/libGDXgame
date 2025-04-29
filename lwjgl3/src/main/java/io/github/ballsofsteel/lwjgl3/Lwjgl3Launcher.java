@@ -30,6 +30,7 @@ public class Lwjgl3Launcher {
         configuration.setWindowedMode(1200, 800);
         //// You can change these files; they are in lwjgl3/src/main/resources/ .
         configuration.setWindowIcon("01.png", "01.png", "01.png", "01.png");
+        configuration.setResizable(false);
         return configuration;
     }
 }

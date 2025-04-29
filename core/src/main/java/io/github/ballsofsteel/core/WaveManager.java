@@ -24,7 +24,7 @@ public final class WaveManager implements GameEventListener {
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 12, 0, 5),
+        new WaveSpec( 5, 5, 5),
         new WaveSpec(12, 4, 0),
         new WaveSpec(14, 5, 3),
         new WaveSpec(18,10, 6)
@@ -167,7 +167,7 @@ public final class WaveManager implements GameEventListener {
     private void spawnDyna(){
         Vector2 p = randPos();
         game.getDynaList().add(factory.createDynamiteGoblin(
-            game.getPlayer(), game.getDynaList(), game.getLoot(), p.x, p.y));
+            game.getPlayer(),  game, game.getDynaList(), game.getLoot(), p.x, p.y));
 
     }
     private void spawnBarrel(){

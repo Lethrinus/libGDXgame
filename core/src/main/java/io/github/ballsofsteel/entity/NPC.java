@@ -31,6 +31,12 @@ public class NPC {
     private int currentLineIndex = 0;
     private boolean inDialogue = false;
 
+
+    private boolean interacted = false;
+
+    private boolean finishedDialogue = false;
+
+
     private float typedSpeed = 20f;
     private float typedTimer = 0f;
     private int typedIndex = 0;
@@ -81,6 +87,10 @@ public class NPC {
         lastDistance = dist;
 
         if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            if (finishedDialogue) {
+                return; // ◄◄ Eğer konuşma bittiyse bir daha konuşamazsın!
+            }
+
             if (firstWaveStarted && isIntervalActive()) {
                 EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
                 return;
@@ -98,6 +108,7 @@ public class NPC {
                     currentLineIndex++;
                     if (currentLineIndex >= dialogues.length) {
                         inDialogue = false;
+                        finishedDialogue = true;
                         if (!firstWaveStarted) {
                             firstWaveStarted = true;
                             EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
@@ -207,5 +218,10 @@ public class NPC {
     private boolean isIntervalActive() {
 
         return false;
+    }
+    public boolean interact() {
+        if (interacted) return false;  // bir kere konuştuktan sonra bir daha konuşma
+        interacted = true;
+        return true;
     }
 }

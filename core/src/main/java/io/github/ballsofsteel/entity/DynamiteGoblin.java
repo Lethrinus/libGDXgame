@@ -1,4 +1,3 @@
-/*  tam dosya – Dinamitçi (kaç / fırlat / patla, red-flash, knock-back, loot) */
 package io.github.ballsofsteel.entity;
 
 import com.badlogic.gdx.Gdx;
@@ -6,210 +5,173 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import io.github.ballsofsteel.core.CoreGame;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
-public class DynamiteGoblin {
+/** Dinamitçi goblin – kaçarken engelden “sörf” yapmaz, duvara takılmaz. */
+public class DynamiteGoblin extends BaseEnemy {
 
-    /* ───────── sprite & animasyon ───────── */
-    private static final Texture SHEET  = new Texture(Gdx.files.internal("Goblin/dynamite_goblin.png"));
-    private static final Texture BOOMS  = new Texture(Gdx.files.internal("Dynamite/explosions_dynamite.png"));
-    private static final Texture DEADTX = new Texture(Gdx.files.internal("deadanimation.png"));
+    /* ── sabitler ── */
+    private static final float SCALE=1f/72f, KEEP=2.8f, THROW=4.2f,
+        SPEED=1.7f, MAX_HP=60f, CD=1.2f;
+
+    /* ── sprite / anim ── */
+    private static final Texture SHEET = new Texture("Goblin/dynamite_goblin.png");
+    private static final Texture BOOMS = new Texture("Dynamite/explosions_dynamite.png");
+    private static final Texture DEAD  = new Texture("deadanimation.png");
     private static final Animation<TextureRegion>
-        runR, runL, throwR, throwL,
-        dynamiteA, explosionA,
-        deathA;
-
-    static {
-        SHEET .setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-        BOOMS .setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-        DEADTX.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-
-        runR   = row(SHEET , 2,  2,1152,192,6,.10f);  runL   = mirror(runR);
-        throwR = row(SHEET , 2,196,1344,192,7,.08f);  throwL = mirror(throwR);
-
-        dynamiteA  = row(BOOMS , 2,  2, 384, 64,6,.06f);
-        explosionA = row(BOOMS , 2, 68,1728,192,9,.06f);
-        deathA     = row(DEADTX, 2,  2,1792,128,14,.07f);
-    }
-    private static Animation<TextureRegion> row(Texture t,int x,int y,int w,int h,int n,float d){
-        return new Animation<>(d,new TextureRegion(t,x,y,w,h).split(w/n,h)[0]);
-    }
-    private static Animation<TextureRegion> mirror(Animation<TextureRegion> src){
-        TextureRegion[] k=src.getKeyFrames(), m=new TextureRegion[k.length];
-        for(int i=0;i<k.length;i++){ m[i]=new TextureRegion(k[i]); m[i].flip(true,false); }
-        return new Animation<>(src.getFrameDuration(),m);
+        runR,runL,throwR,throwL,dynaA,boomA,deathA;
+    static{
+        SHEET.setFilter(Texture.TextureFilter.Nearest,Texture.TextureFilter.Nearest);
+        runR  = BaseEnemy.row(SHEET,2,  2,1152,192,6,.10f);
+        runL  = BaseEnemy.mirror(runR);
+        throwR= BaseEnemy.row(SHEET,2,196,1344,192,7,.1f);
+        throwL= BaseEnemy.mirror(throwR);
+        dynaA = BaseEnemy.row(BOOMS,2,2,384,64,6,.06f);
+        boomA = BaseEnemy.row(BOOMS,2,68,1728,192,9,.06f);
+        deathA= BaseEnemy.row(DEAD ,2,2,1792,128,14,.07f);
     }
 
-    /* ───────── sabitler ───────── */
-    private static final float SCALE = 1f/72f;          // tüm karelerde ortak ölçek
-    private static final float KEEP_DIST  = 2.8f;       // fazla yakınsa kaçar
-    private static final float THROW_DIST = 4.2f;       // bu mesafede durur/fırlatır
-    private static final float MAX_HP     = 60f;
-    private static final float FLASH_TIME = .15f;       // kırmızı parıltı süresi
-    private static final float THROW_COOLDOWN = 1.2f;   // eski değeri ~0.8
-
-
-    private static final Vector2 BRIDGE_TARGET = new Vector2(31.5f, 29.5f);
-    private boolean reachedBridge = false;
-
-
-    /* ───────── referanslar ───────── */
-    private final Player player;
-    private final List<DynamiteGoblin> crowd;
-    private final List<GoldBag> loot;
-
-    /* ───────── durum ───────── */
-    private float x,y, hp=MAX_HP;
-    private float flashTimer=0f;                       // red-flash sayacı
-    private final Vector2 knock = new Vector2();       // geri tepme
-    private float throwCD = 0f;                         // alan ekle
-
-
+    /* ── referans & durum ── */
+    private final Player player; private final CoreGame game;
+    private final List<DynamiteGoblin> crowd; private final List<GoldBag> loot;
     private enum ST{MOVE,THROW,DIE} private ST st=ST.MOVE;
-    private float tThrow,tState; private boolean released;
+    private float tThrow,stateT,cd=0; private boolean released;
+    private final ArrayList<Dynamite> bombs=new ArrayList<>();
 
-    private final ArrayList<Dynamite> bombs = new ArrayList<>();
+    /* A* */
+    private List<Vector2> path=new ArrayList<>(); private int idx=0;
+    private float timer=0; private static final float REPLAN=.4f;
 
-    public DynamiteGoblin(Player p,List<DynamiteGoblin> same,List<GoldBag> loot,
-                          float sx,float sy){
-        player=p; crowd=same; this.loot=loot; x=sx; y=sy;
-    }
-    private Vector2 getTargetPosition() {
-        if (player.getY() > 32f && !reachedBridge) {
-            return BRIDGE_TARGET;
-        }
-        return new Vector2(player.getX(), player.getY());
+    public DynamiteGoblin(Player p,CoreGame g,List<DynamiteGoblin> same,
+                          List<GoldBag> loot,float sx,float sy){
+        super(sx,sy,MAX_HP,g.getMap());           //  <-- map’i ilet
+        player=p; game=g; crowd=same; this.loot=loot;
     }
 
-    /* ───────── ana update ───────── */
-    public void update(float dt) {
-        bombs.removeIf(b -> b.update(dt));
-        if (throwCD > 0) throwCD -= dt;
-        if (st == ST.DIE) { tState += dt; return; }
+    /* ───────────────── update ───────────────── */
+    public void update(float dt){
 
-        for (DynamiteGoblin g : crowd) {
-            if (g != this && g.st != ST.DIE) {
-                float dx = x - g.x, dy = y - g.y;
-                if (dx * dx + dy * dy < .4f) {
-                    float d = (float) Math.sqrt(dx * dx + dy * dy);
-                    x += dx / d * dt * 1.5f;
-                    y += dy / d * dt * 1.5f;
-                }
+        baseUpdate(dt); bombs.removeIf(b->b.update(dt));
+        if(cd>0) cd-=dt; stateT+=dt; if(st==ST.DIE) return;
+
+        separateFromCrowd(crowd,.4f,1.5f,dt);
+
+        float dx=player.getX()-x, dy=player.getY()-y;
+        float dist=(float)Math.sqrt(dx*dx+dy*dy);
+
+        if(st==ST.THROW){
+            tThrow+=dt;
+            if(!released && tThrow>=.32f){
+                bombs.add(new Dynamite(x,y, dx/dist*3.5f, dy/dist*3.5f));
+                released=true;
             }
+            if(tThrow>=.5f){ st=ST.MOVE; }
+            return;
         }
 
-        Vector2 target = getTargetPosition();
-        float dx = target.x - x, dy = target.y - y;
-        float dist = (float) Math.sqrt(dx * dx + dy * dy);
+        /* ----- hareket ----- */
+        if(dist<KEEP){                        // kaç
+            tryMove(x - dx/dist*SPEED*dt*1.3f,
+                y - dy/dist*SPEED*dt*1.3f, dt);
 
-        if (!reachedBridge && BRIDGE_TARGET.dst2(x, y) < 1f) reachedBridge = true;
+        } else if(dist>THROW){                // yaklaş
+            movePath(player.getX(),player.getY(),dt);
 
-        if (st == ST.THROW) {
-            tThrow += dt;
-            if (!released && tThrow >= .32f) {
-                bombs.add(new Dynamite(x, y, dx / dist * 3.5f, dy / dist * 3.5f));
-                released = true;
-            }
-            if (tThrow >= .5f) st = ST.MOVE;
-        } else {
-            if (dist < 2.8f) { x -= dx / dist * dt * 2f; y -= dy / dist * dt * 2f; }
-            else if (dist > 4.2f) { x += dx / dist * dt * 1.7f; y += dy / dist * dt * 1.7f; }
-            else {
-                if (throwCD <= 0f) {
-                    st = ST.THROW; tThrow = 0; released = false;
-                    throwCD = 1.2f;
-                }
-            }
+        } else if(cd<=0){                     // fırlat
+            st=ST.THROW; tThrow=0; released=false; cd=CD;
         }
-
-        if (knock.len2() > .0001f) {
-            x += knock.x * dt; y += knock.y * dt;
-            knock.scl(1 - dt * 4f);
-        }
-        if(flashTimer>0) flashTimer-=dt;
-        tState += dt;
     }
 
-    /* ───────── render ───────── */
+    /* güvenli adım */
+    private void tryMove(float nx,float ny,float dt){
+        if(!map.isCellBlocked((int)nx,(int)ny,null)){ x=nx; y=ny; }
+    }
+
+    /* A* takip */
+    private void movePath(float tx,float ty,float dt){
+        timer-=dt;
+        if(timer<=0||idx>=path.size()){
+            path=findPath(map,(int)x,(int)y,(int)tx,(int)ty);
+            idx=0; timer=REPLAN;
+        }
+        if(idx<path.size()){
+            Vector2 g=path.get(idx);
+            float gx=g.x-x, gy=g.y-y, d=(float)Math.sqrt(gx*gx+gy*gy);
+            if(d<.1f) idx++; else tryMove(x+gx/d*SPEED*dt, y+gy/d*SPEED*dt, dt);
+        }
+    }
+
+    /* ───────────────── render / damage vs ───────────────── */
     public void render(SpriteBatch b){
         bombs.forEach(d->d.render(b));
-
-        // animasyon karesi + yön belirleme
-        boolean playerLeft = player.getX() < x;
-        boolean fleeing    = (st==ST.MOVE &&
-            (player.getX()-x)*(player.getX()-x)+
-                (player.getY()-y)*(player.getY()-y) < KEEP_DIST*KEEP_DIST);
-
-        TextureRegion fr =
-            st==ST.DIE   ? deathA.getKeyFrame(tState,false)
-                : st==ST.THROW ? (player.getX()<x ? throwL : throwR).getKeyFrame(tThrow,false)
-                : /* MOVE */    (fleeing
-                ? (player.getX()<x ? runR : runL).getKeyFrame(tState,true)
-                : (player.getX()<x ? runL : runR).getKeyFrame(tState,true));
-
-        float w = fr.getRegionWidth()  * SCALE;
-        float h = fr.getRegionHeight() * SCALE;
-        b.draw(fr, x-w/2f, y-h/2f, w, h);
-
-        // red-flash SADECE hayattayken
-        if(flashTimer>0 && st!=ST.DIE){
-            b.setColor(1,0,0,0.3f);
-            b.draw(fr, x-w/2f, y-h/2f, w, h);
-            b.setColor(1,1,1,1);
-        }
-
-        if(st!=ST.DIE)
-            HealthBarRenderer.drawBar(b, x, y+1f, hp/MAX_HP, true);
+        boolean left=player.getX()<x;
+        boolean flee= (player.getX()-x)*(player.getX()-x)+
+            (player.getY()-y)*(player.getY()-y) < KEEP*KEEP;
+        TextureRegion fr=
+            st==ST.DIE  ? deathA.getKeyFrame(stateT,false)
+                : st==ST.THROW? (left?throwL:throwR).getKeyFrame(tThrow,false)
+                :               (flee?(left?runR:runL):(left?runL:runR)).getKeyFrame(stateT,true);
+        float w=fr.getRegionWidth()*SCALE, h=fr.getRegionHeight()*SCALE;
+        b.draw(fr,x-w/2f,y-h/2f,w,h);
+        if(flashTimer>0){ b.setColor(1,0,0,0.3f); b.draw(fr,x-w/2f,y-h/2f,w,h); b.setColor(1,1,1,1); }
+        if(st!=ST.DIE) HealthBarRenderer.drawBar(b,x,y+1f,hp/maxHp,true);
     }
 
-    /* ───────── damage ───────── */
-    public void takeDamage(float dmg,float kb,float angDeg){
-        if(st==ST.DIE) return;
-        hp-=dmg; flashTimer=FLASH_TIME;
-
-        float rad = angDeg*MathUtils.degreesToRadians;
-        knock.add(MathUtils.cos(rad)*kb, MathUtils.sin(rad)*kb);
-
-        if(hp<=0){
-            st=ST.DIE; tState=0;
+    @Override public void takeDamage(float d,float k,float a){
+        if(st==ST.DIE) return; super.takeDamage(d,k,a);
+        if(hp<=0){ st=ST.DIE; stateT=0;
             if(MathUtils.randomBoolean(1f))
-                loot.add(new GoldBag(x + MathUtils.random(-.4f,.4f),
-                    y + MathUtils.random(-.4f,.4f)));
+                loot.add(new GoldBag(x+MathUtils.random(-.4f,.4f),
+                    y+MathUtils.random(-.4f,.4f)));
         }
     }
-    public boolean isDead(){ return st==ST.DIE && deathA.isAnimationFinished(tState); }
+    @Override public boolean isDead(){ return st==ST.DIE&&deathA.isAnimationFinished(stateT); }
+    @Override public boolean isDying(){ return st==ST.DIE&&!isDead(); }
 
-    /* ───────── iç sınıf: uçan dinamit ───────── */
+    /* ───────── iç sınıf: Dinamit ───────── */
     private class Dynamite{
-        final Vector2 pos=new Vector2(), vel=new Vector2();
-        float fuse=1.1f, boomT; boolean exploding;
+        float rotation = 0f;
+        Vector2 pos=new Vector2(), vel=new Vector2(); float fuse=1.1f,boomT;
+        boolean exploding;
         Dynamite(float sx,float sy,float vx,float vy){ pos.set(sx,sy); vel.set(vx,vy); }
         boolean update(float dt){
-            if(exploding){ boomT+=dt; return explosionA.isAnimationFinished(boomT); }
-
+            rotation += 720f * dt;
+            if(exploding){ boomT+=dt; return boomA.isAnimationFinished(boomT); }
             fuse-=dt; pos.mulAdd(vel,dt);
-            if(fuse<=0){
-                exploding=true; boomT=0;
+            if(fuse<=0){ exploding=true; boomT=0;
                 float dx=player.getX()-pos.x, dy=player.getY()-pos.y;
-                if(dx*dx+dy*dy<1.5f*1.5f){
+                if(dx*dx+dy*dy<2.25f){
                     float ang=MathUtils.atan2(dy,dx)*MathUtils.radiansToDegrees;
                     player.takeDamage(25f,4f,ang);
                 }
+            } return false;
+        }
+        void render(SpriteBatch b) {
+            TextureRegion fr = exploding ? boomA.getKeyFrame(boomT)
+                : dynaA.getKeyFrame(fuse, true);
+            float s = 1f / 64f;
+            float w = fr.getRegionWidth() * s;
+            float h = fr.getRegionHeight() * s;
+
+            if (exploding) {
+                // Patlama sabit çizilir (dönmez)
+                b.draw(fr,
+                    pos.x - w / 2f, pos.y - h / 2f,
+                    w, h);
+            } else {
+                // Sadece uçan dinamit döner
+                b.draw(fr,
+                    pos.x - w / 2f, pos.y - h / 2f,
+                    w / 2f, h / 2f,   // origin
+                    w, h,
+                    1f, 1f,
+                    rotation);
             }
-            return false;
-        }
-        void render(SpriteBatch b){
-            TextureRegion fr = exploding ? explosionA.getKeyFrame(boomT)
-                : dynamiteA .getKeyFrame(fuse,true);
-            float s=1f/64f, w=fr.getRegionWidth()*s, h=fr.getRegionHeight()*s;
-            b.draw(fr, pos.x-w/2f, pos.y-h/2f, w, h);
         }
     }
-    public void dispose() {
-    }
-    /* ───────── getter’lar ───────── */
-    public float getX(){ return x; }
-    public float getY(){ return y; }
+    public void dispose(){}
 }

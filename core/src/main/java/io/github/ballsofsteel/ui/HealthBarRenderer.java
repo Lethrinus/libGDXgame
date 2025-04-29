@@ -34,7 +34,7 @@ public final class HealthBarRenderer {
         /* dolu kısım */
         Color c = enemy
             ? new Color(MathUtils.lerp(0f, 1f, 1 - ratio), 1f, 0f, 1f)  // yeşil→sarı
-            : (ratio > .5f ? Color.LIME : Color.GOLD);                  // yeşil / sarı
+            : (ratio > .5f ? Color.LIME : Color.RED);                  // yeşil / sarı
         SR.setColor(c);
         SR.rect(cx - .49f, cy + .01f, .98f * ratio, .10f);
 

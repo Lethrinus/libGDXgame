@@ -44,11 +44,11 @@ public class GameEntityFactory implements EntityFactory {
     }
 
     @Override
-    public DynamiteGoblin createDynamiteGoblin(Player player,
+    public DynamiteGoblin createDynamiteGoblin(Player player,CoreGame game,
                                                List<DynamiteGoblin> crowd,
                                                List<GoldBag> loot,
                                                float x,float y){
-        return new DynamiteGoblin(player,crowd,loot,x,y);
+        return new DynamiteGoblin(player,game,crowd,loot,x,y);
     }
 
     public BarrelBomber createBarrelBomber(Player player,

@@ -25,7 +25,7 @@ public interface EntityFactory {
                         List<GoldBag> sharedLoot);
 
     /* -------- dinamit goblini -------- */
-    DynamiteGoblin createDynamiteGoblin(Player       player,
+    DynamiteGoblin createDynamiteGoblin(Player       player, CoreGame game,
                                         List<DynamiteGoblin> crowd,
                                         List<GoldBag>       sharedLoot,
                                         float x,float y);

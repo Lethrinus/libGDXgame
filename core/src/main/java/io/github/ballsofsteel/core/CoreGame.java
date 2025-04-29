@@ -152,7 +152,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
             if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1 + i))
                 hud.setSelectedSlot(i);
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) useSelectedItem();
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) useSelectedItem();
     }
 
     /* ---------------------------------------------------------------------- */
