@@ -36,7 +36,15 @@ public class Player {
     // Movement animations.
     private Animation<TextureRegion> idleAnimation, idleAnimationLeft, runningRight, runningLeft;
     // Attack animations.
-    private Animation<TextureRegion> attackTop, attackBottom, attackRight, attackLeft;
+    private Animation<TextureRegion>
+        atkTop1,    atkTop2,
+        atkBot1,    atkBot2,
+        atkRight1,  atkRight2,
+        atkLeft1,   atkLeft2;
+
+
+    private int  lastDir = 0;        // 0=R,1=U,2=L,3=D  (son saldırı yönü)
+    private boolean useSecond = false;
 
     private Animation<TextureRegion> healAnimation;
     private Texture healTexture;
@@ -92,6 +100,12 @@ public class Player {
     private float redFlashDuration = 0.2f;
     private float redFlashTimer = 0f;
 
+    private static final float ATTACK_ARC_DEG = 40f;     // ±40°
+    private static final float ATTACK_ARC_RAD =
+        ATTACK_ARC_DEG * MathUtils.degreesToRadians;
+    private float attackDirRad = 0f;
+
+
     // Knockback vector.
     private Vector2 knockback = new Vector2(0, 0);
     private float knockbackDecay = 5f;
@@ -143,26 +157,41 @@ public class Player {
         healAnimation = new Animation<TextureRegion>(0.1f, healFrames);
         healAnimation.setPlayMode(Animation.PlayMode.NORMAL);
 
-        // Define subregions for animations.
-        TextureRegion idleRegion         = new TextureRegion(atlas, 2, 2, 1152, 195);
-        TextureRegion attackTopRegion    = new TextureRegion(atlas, 2, 199, 1152, 195);
-        TextureRegion attackBottomRegion = new TextureRegion(atlas, 2, 396, 1152, 195);
-        TextureRegion attackRightRegion  = new TextureRegion(atlas, 2, 593, 1152, 195);
-        TextureRegion runRightRegion     = new TextureRegion(atlas, 2, 790, 1152, 195);
+        // ▼▼ ctor içinde atlas region’larını tanımladığın kısmı TAMAMEN değiştir ▼▼
+        TextureRegion idleRegion  = new TextureRegion(atlas, 2,     2, 1152,192);
+        TextureRegion runRRegion  = new TextureRegion(atlas, 2,  1360, 1152,192);
 
-        frameWidth  = 1152 / NUM_FRAMES; // 192 pixels per frame.
-        frameHeight = 195;
+        TextureRegion atkTopR1   = new TextureRegion(atlas, 2,   196, 1152,192);
+        TextureRegion atkTopR2   = new TextureRegion(atlas, 2,   584, 1152,192);
+        TextureRegion atkBotR1   = new TextureRegion(atlas, 2,   972, 1152,192);
+        TextureRegion atkBotR2   = new TextureRegion(atlas, 2,   390, 1152,192);
+        TextureRegion atkRightR1 = new TextureRegion(atlas, 2,  1166, 1152,192);
+        TextureRegion atkRightR2 = new TextureRegion(atlas, 2,   778, 1152,192);
 
-        idleAnimation     = buildAnimation(idleRegion, 0.25f, Animation.PlayMode.LOOP);
+        frameWidth  = 1152 / NUM_FRAMES;
+        frameHeight = 192;                       // (yükseklik artık 192)
+
+// 1) idle & run
+        idleAnimation     = buildAnimation(idleRegion , .25f, Animation.PlayMode.LOOP);
         idleAnimationLeft = mirrorAnimation(idleAnimation);
-        attackTop         = buildAnimation(attackTopRegion, 0.05f, Animation.PlayMode.NORMAL);
-        attackBottom      = buildAnimation(attackBottomRegion, 0.05f, Animation.PlayMode.NORMAL);
-        attackRight       = buildAnimation(attackRightRegion, 0.05f, Animation.PlayMode.NORMAL);
-        attackLeft        = mirrorAnimation(attackRight);
-        runningRight      = buildAnimation(runRightRegion, 0.1f, Animation.PlayMode.LOOP);
+        runningRight      = buildAnimation(runRRegion, .10f, Animation.PlayMode.LOOP);
         runningLeft       = mirrorAnimation(runningRight);
 
+// 2) attack set-1
+        atkTop1    = buildAnimation(atkTopR1  , .065f, Animation.PlayMode.NORMAL);
+        atkBot1    = buildAnimation(atkBotR1  , .065f, Animation.PlayMode.NORMAL);
+        atkRight1  = buildAnimation(atkRightR1, .065f, Animation.PlayMode.NORMAL);
+        atkLeft1   = mirrorAnimation(atkRight1);
+
+// 3) attack set-2
+        atkTop2    = buildAnimation(atkTopR2  , .065f, Animation.PlayMode.NORMAL);
+        atkBot2    = buildAnimation(atkBotR2  , .065f, Animation.PlayMode.NORMAL);
+        atkRight2  = buildAnimation(atkRightR2, .065f, Animation.PlayMode.NORMAL);
+        atkLeft2   = mirrorAnimation(atkRight2);
+
+// başta hareket animasyonu
         currentMovementAnim = idleAnimation;
+
 
         // Set starting position.
         x = 8;
@@ -325,57 +354,56 @@ public class Player {
 
         // Handle attack input.
         if (!isAttacking && Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            isAttacking = true;
-            attackStateTime = 0f;
-            attackExecuted = false;
 
-            Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-            camera.unproject(mousePos);
-            float angleDeg = MathUtils.atan2(mousePos.y - y, mousePos.x - x) * MathUtils.radiansToDegrees;
-            if (angleDeg >= -45 && angleDeg < 45) {
-                currentAttackAnim = attackRight;
-                facingRight = true;
-            } else if (angleDeg >= 45 && angleDeg < 135) {
-                currentAttackAnim = attackTop;
-            } else if (angleDeg >= -135 && angleDeg < -45) {
-                currentAttackAnim = attackBottom;
-            } else {
-                currentAttackAnim = attackLeft;
-                facingRight = false;
+            Vector3 m = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+            camera.unproject(m);
+
+            /* ►► YENİ: saldırı yönünü sakla ◄◄ */
+            attackDirRad = MathUtils.atan2(m.y - y, m.x - x);
+
+            float angDeg = attackDirRad * MathUtils.radiansToDegrees;
+
+            /* yön = 0:R 1:U 2:L 3:D (aynı hesap) */
+            int dir = (angDeg>=-45 && angDeg<45)?0
+                :(angDeg>=45 && angDeg<135)?1
+                :(angDeg<=-135||angDeg>135)?2 : 3;
+
+            useSecond = (dir==lastDir) && !useSecond;
+            switch(dir){
+                case 0: currentAttackAnim = useSecond?atkRight2:atkRight1; facingRight=true;  break;
+                case 1: currentAttackAnim = useSecond?atkTop2  :atkTop1;                     break;
+                case 2: currentAttackAnim = useSecond?atkLeft2 :atkLeft1;  facingRight=false; break;
+                case 3: currentAttackAnim = useSecond?atkBot2  :atkBot1;                     break;
             }
+            lastDir = dir;
+            attackStateTime = 0f;
+            isAttacking = true;
+            attackExecuted = false;
         }
 
-        // Attack logic.
+        /* ---------- saldırı hasarı ---------- */
         if (isAttacking) {
-            attackStateTime += delta;
+            float dt = Gdx.graphics.getDeltaTime();
+            attackStateTime += dt;
 
             if (!attackExecuted && attackStateTime >= attackHitTime) {
 
-                // dynamite
-                boolean hitSomething = false;
+                /* dinamit goblin */
                 for (DynamiteGoblin dg : core.getDynaList()) {
-                    float ddx = dg.getX() - x, ddy = dg.getY() - y;
-                    if (ddx * ddx + ddy * ddy <= attackRange * attackRange) {
-                        float ang = MathUtils.atan2(ddy, ddx) * MathUtils.radiansToDegrees;
-                        dg.takeDamage(attackDamage, attackKnockbackForce, ang);
-                        hitSomething = true;
-                    }
+                    if (withinAttackCone(dg.getX(), dg.getY()))
+                        dg.takeDamage(attackDamage, attackKnockbackForce,
+                            angleDegTo(dg.getX(), dg.getY()));
                 }
 
-                //normal goblin
+                /* normal goblin */
                 for (Goblin g : core.getGoblins()) {
-                    float gx = g.getX() - x, gy = g.getY() - y;
-                    if (gx * gx + gy * gy <= attackRange * attackRange) {
-                        float ang = MathUtils.atan2(gy, gx) * MathUtils.radiansToDegrees;
-                        g.takeDamage(attackDamage, attackKnockbackForce, ang);
-                        hitSomething = true;
-                    }
+                    if (withinAttackCone(g.getX(), g.getY()))
+                        g.takeDamage(attackDamage, attackKnockbackForce,
+                            angleDegTo(g.getX(), g.getY()));
                 }
-
-                if (hitSomething) attackExecuted = true;
+                attackExecuted = true;
             }
-
-            if (attackStateTime >= attackDuration) isAttacking = false;
+            if (attackStateTime >= attackDuration) isAttacking=false;
         }
          else {
             // Store old position.
@@ -426,7 +454,20 @@ public class Player {
         if (redFlashTimer > 0) redFlashTimer -= delta;
         updateGhosts(delta);
     }
+    private float angleDegTo(float tx,float ty){
+        return MathUtils.atan2(ty-y, tx-x) * MathUtils.radiansToDegrees;
+    }
 
+    /** Hedef, menzil içinde VE koni içinde mi? */
+    private boolean withinAttackCone(float tx,float ty){
+        float dx=tx-x, dy=ty-y;
+        if (dx*dx+dy*dy > attackRange*attackRange) return false;
+
+        float ang = MathUtils.atan2(dy,dx);
+        float diff = MathUtils.atan2(MathUtils.sin(ang-attackDirRad),
+            MathUtils.cos(ang-attackDirRad));
+        return Math.abs(diff) <= ATTACK_ARC_RAD;
+    }
     private void spawnGhostImage() {
         TextureRegion frame = currentMovementAnim.getKeyFrame(movementStateTime);
         GhostFrame gf = new GhostFrame();
