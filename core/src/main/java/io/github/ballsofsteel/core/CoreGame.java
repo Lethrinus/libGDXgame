@@ -25,7 +25,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private SpriteBatch batch;
     private final OrthographicCamera cam = new OrthographicCamera();
     private TileMapRenderer map;
-
+    private CameraShake cameraShake;
     /* ---------- varlık listeleri ---------- */
     private Player player;
     private NPC    npc;
@@ -50,7 +50,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public void create() {
 
         batch = new SpriteBatch();
-        cam.setToOrtho(false, 44, 44f);
+        cam.setToOrtho(false, 21, 12.35f);
         //21, 12.35f
 
         map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
@@ -71,6 +71,8 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         hud.loadTextures();
         goldUI = new GoldCounterUI(hud.getCamera());
 
+        // camera shake
+        cameraShake = new CameraShake(cam);
         /* Upgrade menüsü & dalga yöneticisi */
         upgradeMenu = new UpgradeMenu();
         waveManager = new WaveManager(this, factory);
@@ -94,33 +96,30 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     /* ---------------------------------------------------------------------- */
     @Override
     public void render() {
-
         float dt = Gdx.graphics.getDeltaTime();
 
         handleInput(dt);
 
-        /* Menü açıkken oyun güncellenmez (pause) */
         if (!upgradeMenu.isVisible()) {
-
-            /* --- güncelleme --- */
             player.update(dt);
             npc.update(dt, new Vector2(player.getX(), player.getY()));
-
             goblins.forEach(g -> g.update(dt));
-            dynas  .removeIf(d -> { d.update(dt); return d.isDead();     });
+            dynas.removeIf(d -> { d.update(dt); return d.isDead(); });
             barrels.removeIf(b -> { b.update(dt); return b.isFinished(); });
 
             updateLoot();
             waveManager.update(dt);
+
+
             updateCamera(dt);
+            cameraShake.update(dt);
         }
 
-        /* --- çizim --- */
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         renderWorld();
         renderHUD();
-        upgradeMenu.render(batch);   // menü daima en üstte
+        upgradeMenu.render(batch);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -272,6 +271,8 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public List<GoldBag>        getLoot()     { return loot;     }
     public Player               getPlayer()   { return player;   }
     public TileMapRenderer      getMap()      { return map;      }
+    public CameraShake getCameraShake()       { return cameraShake;
+    }
 
     public void addGoblin(Goblin g) { goblins.add(g); }
 }

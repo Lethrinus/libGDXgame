@@ -4,6 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
+import io.github.ballsofsteel.core.CoreGame;
+
 import java.util.List;
 
 public class BarrelBomber {
@@ -45,14 +47,15 @@ public class BarrelBomber {
     /* ---------- referanslar ve state ---------- */
     private final Player player;
     private final List<BarrelBomber> crowd;
-
+    private CoreGame core;
     private float x, y, baseY, hop;
     private float t, preBoomT, boomT;
     private boolean preparing, exploding, finished, facingLeft;
-    private boolean damageApplied; // sadece bir kez damage vereceğiz
+    private boolean damageApplied;
 
-    public BarrelBomber(Player player, List<BarrelBomber> crowd, float startX, float startY) {
+    public BarrelBomber(Player player, CoreGame core, List<BarrelBomber> crowd, float startX, float startY) {
         this.player = player;
+        this.core = core;
         this.crowd = crowd;
         this.x = startX;
         this.baseY = this.y = startY;
@@ -65,6 +68,10 @@ public class BarrelBomber {
                 preparing = false;
                 exploding = true;
                 boomT = 0;
+
+                if (core != null) {
+                    core.getCameraShake().shake(0.4f, 0.2f); // patlamayla aynı anda
+                }
             }
             return;
         }
@@ -85,6 +92,7 @@ public class BarrelBomber {
 
             if (explodeA.isAnimationFinished(boomT)) {
                 finished = true;
+
             }
             return;
         }

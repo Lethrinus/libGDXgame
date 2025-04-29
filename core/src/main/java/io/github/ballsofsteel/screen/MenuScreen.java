@@ -52,27 +52,44 @@ public class MenuScreen implements Screen {
     }
 
     private void buildUI() {
-        Table root = new Table(); root.setFillParent(true); stage.addActor(root);
+        Table root = new Table();
+        root.setFillParent(true);
+        stage.addActor(root);
+
+        // === Background Ekle ===
+        Texture backgroundTexture = new Texture(Gdx.files.internal("HUD/background.png"));
+        Image background = new Image(new TextureRegionDrawable(new TextureRegion(backgroundTexture)));
+        background.setFillParent(true);
+        stage.addActor(background);
+
+        // === UI Elemanları ===
+        Table uiTable = new Table();
+        uiTable.setFillParent(true);
+        uiTable.right().padRight(100f);
+        stage.addActor(uiTable);
 
         Label lbl = new Label("Balls of Steel", skin, "title");
-        root.add(lbl).padBottom(40).row();
+        uiTable.add(lbl).padBottom(40).padRight(50f).right().row();
+        TextButton play = new TextButton("Play Game", skin, "blue");
+        TextButton quit = new TextButton("Exit", skin, "red");
 
-        TextButton play   = new TextButton("Play Game", skin, "blue");
-        TextButton quit   = new TextButton("Exit",      skin, "red");
+        uiTable.add(play).width(320).height(90).pad(10).right().row();
+        uiTable.add(quit).width(320).height(90).pad(10).right();
 
-        root.add(play).width(320).height(90).pad(10).row();
-        root.add(quit).width(320).height(90).pad(10);
-
-        play.addListener(new ClickListener(){
-            @Override public void clicked(InputEvent e,float x,float y){
+        // === Button Listener ===
+        play.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent e, float x, float y) {
                 stage.addAction(Actions.sequence(
                     Actions.fadeOut(0.4f),
                     Actions.run(() -> game.setScreen(new PlayScreen(game)))
                 ));
             }
         });
-        quit.addListener(new ClickListener(){ @Override
-        public void clicked(InputEvent e,float x,float y){ Gdx.app.exit(); } });
+        quit.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent e, float x, float y) {
+                Gdx.app.exit();
+            }
+        });
     }
 
     @Override public void render(float delta){

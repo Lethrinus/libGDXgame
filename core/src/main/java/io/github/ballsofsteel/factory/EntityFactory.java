@@ -31,9 +31,10 @@ public interface EntityFactory {
                                         float x,float y);
 
     /* -------- varil bombacısı -------- */
-    BarrelBomber  createBarrelBomber   (Player         player,
-                                        List<BarrelBomber> crowd,
-                                        float x,float y);
+    BarrelBomber createBarrelBomber(Player player,
+                                    CoreGame game,
+                                    List<BarrelBomber> crowd,
+                                    float x, float y);
 
     /* -------- NPC -------- */
     NPC createNPC(CoreGame game,float x,float y,String[] lines);

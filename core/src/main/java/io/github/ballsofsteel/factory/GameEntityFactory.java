@@ -51,10 +51,11 @@ public class GameEntityFactory implements EntityFactory {
         return new DynamiteGoblin(player,crowd,loot,x,y);
     }
 
-    public BarrelBomber createBarrelBomber(Player p,
+    public BarrelBomber createBarrelBomber(Player player,
+                                           CoreGame game,
                                            List<BarrelBomber> crowd,
-                                           float x,float y){
-        return new BarrelBomber(p,crowd,x,y);
+                                           float x, float y) {
+        return new BarrelBomber(player, game, crowd, x, y);
     }
 
     @Override public NPC createNPC(CoreGame game, float x,float y,String[] lines){

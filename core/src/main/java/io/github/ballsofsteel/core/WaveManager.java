@@ -28,7 +28,7 @@ public final class WaveManager implements GameEventListener {
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
     private final List<WaveSpec> waves = Arrays.asList(
-            new WaveSpec(12,  15, 3),
+            new WaveSpec(0,  0, 5),
             new WaveSpec(12,  4, 0),
             new WaveSpec(14,  5, 3),
             new WaveSpec(18, 10, 6)
@@ -38,7 +38,7 @@ public final class WaveManager implements GameEventListener {
     private final CoreGame game;
     private final GameEntityFactory factory;
     private final Random rng = new Random();
-    private final int MAX_ALIVE = 8; // max düşman sayısı
+    private final int MAX_ALIVE = 222; // max düşman sayısı
     private int currentWave = -1;
     private float intervalTimer = 0f;
     private static final float INTERVAL_LEN = 30f;
@@ -143,10 +143,10 @@ public final class WaveManager implements GameEventListener {
         game.getDynaList().add(factory.createDynamiteGoblin(
                 game.getPlayer(), game.getDynaList(), game.getLoot(), p.x, p.y));
     }
-    private void spawnBarrel(){
+    private void spawnBarrel() {
         Vector2 p = randPos();
         game.getBarrels().add(factory.createBarrelBomber(
-                game.getPlayer(), game.getBarrels(), p.x, p.y));
+            game.getPlayer(), game, game.getBarrels(), p.x, p.y));
     }
 
     private Vector2 randPos(){

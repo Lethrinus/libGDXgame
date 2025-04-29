@@ -6,6 +6,7 @@ Goblin/dynamite_goblin.atlas
 Goblin/dynamite_goblin.png
 Goblin/goblin_animations.atlas
 Goblin/goblin_animations.png
+HUD/background.png
 HUD/cursor.png
 HUD/gold_bag.png
 HUD/inventory_bg.png
