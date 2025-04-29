@@ -4,146 +4,173 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.entity.*;
-import io.github.ballsofsteel.events.EventBus;
-import io.github.ballsofsteel.events.GameEvent;
-import io.github.ballsofsteel.events.GameEventListener;
-import io.github.ballsofsteel.events.GameEventType;
+import io.github.ballsofsteel.events.*;
 import io.github.ballsofsteel.factory.GameEntityFactory;
 
 import java.util.*;
 
 public final class WaveManager implements GameEventListener {
 
-    /* -------- durum -------- */
+    /* ---------- durum ---------- */
     private enum State { PRE_WAVE, IN_WAVE, INTERVAL, COMPLETED }
     private State state = State.PRE_WAVE;
 
-    /* -------- dalga arası bayrağı -------- */
     private static boolean intervalActive = false;
     public  static boolean isIntervalActive() { return intervalActive; }
 
-    /* -------- dalga şablonu -------- */
+    /* ---------- dalga şablonu ---------- */
     private static final class WaveSpec {
         final int gob, dyn, barrel;
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
     private final List<WaveSpec> waves = Arrays.asList(
-            new WaveSpec(0,  0, 5),
-            new WaveSpec(12,  4, 0),
-            new WaveSpec(14,  5, 3),
-            new WaveSpec(18, 10, 6)
+        new WaveSpec( 0, 0, 5),
+        new WaveSpec(12, 4, 0),
+        new WaveSpec(14, 5, 3),
+        new WaveSpec(18,10, 6)
     );
 
-    /* -------- referans / sayaç -------- */
-    private final CoreGame game;
-    private final GameEntityFactory factory;
+    /* ---------- referans / sayaç ---------- */
+    private final CoreGame           game;
+    private final GameEntityFactory  factory;
     private final Random rng = new Random();
-    private final int MAX_ALIVE = 222; // max düşman sayısı
-    private int currentWave = -1;
-    private float intervalTimer = 0f;
+
+    private static final int   MAX_ALIVE    = 222;
     private static final float INTERVAL_LEN = 30f;
     private static final float SPAWN_GAP    = 1.1f;
+    private static final float COUNTDOWN_GAP= 1f;
 
-    private float spawnTimer = 0f;
+    private int   currentWave  = -1;
+    private float intervalTimer= 0f;
+    private float spawnTimer   = 0f;
+
     private final Deque<Runnable> queue = new ArrayDeque<>();
+
+    /* ----- geri sayım ----- */
+    private int   countNum   = 0;     // 3-2-1-0
+    private float countTimer = 0f;
+    private boolean counting = false;
 
     public WaveManager(CoreGame g, GameEntityFactory f){
         game = g; factory = f;
         EventBus.register(this);
     }
 
-    /* -------- update -------- */
-    public void update(float dt){
+    /* ======================== update ======================== */
+    public void update(float dt) {
 
+        /* 1) geri sayım */
+        if (counting){
+            countTimer += dt;
+            if (countTimer >= COUNTDOWN_GAP){
+                countTimer = 0f;
+                countNum--;
+                EventBus.post(new GameEvent(GameEventType.WAVE_COUNTDOWN, countNum));
+                if (countNum < 0) counting = false;  // GO!
+            }
+        }
+
+        /* 2) dalga durumu */
         switch (state){
 
             case IN_WAVE:
-                spawnTimer -= dt;
-
-                int alive = game.getGoblins().size() + game.getDynaList().size() + game.getBarrels().size();
-
-                if (spawnTimer <= 0f && !queue.isEmpty() && alive < MAX_ALIVE) {
-                    queue.pollFirst().run();
-                    spawnTimer = SPAWN_GAP;
-                }
-
-                /* dalga bitti mi? */
-                if (queue.isEmpty()
-                    && game.getGoblins().isEmpty()
-                    && game.getDynaList().isEmpty()
-                    && game.getBarrels().isEmpty()) {
-
-                    if (currentWave >= waves.size() - 1) {
-                        state = State.COMPLETED;
-                        intervalActive = false;
-                        EventBus.post(new GameEvent(GameEventType.GAME_COMPLETED, null));
-                    } else {
-                        state = State.INTERVAL;
-                        intervalActive = true;
-                        intervalTimer = INTERVAL_LEN;
-                    }
-                }
+                handleInWave(dt);
                 break;
-
 
             case INTERVAL:
-                /* SPACE ile beklemeyi atla */
-                if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE))
-                    intervalTimer = 0f;
-                intervalTimer -= dt;
-                if (intervalTimer <= 0f) startNextWave();
+                handleInterval(dt);
                 break;
 
-            default: break;
+            default:
+                break;
         }
     }
 
-    /* -------- EventBus -------- */
+    /* =========== IN_WAVE =========== */
+    private void handleInWave(float dt){
+
+        if (counting) return;      // Sayım bitene kadar spawn yok.
+
+        spawnTimer -= dt;
+        int alive = game.getGoblins().size()
+            + game.getDynaList().size()
+            + game.getBarrels().size();
+
+        if (spawnTimer <= 0f && !queue.isEmpty() && alive < MAX_ALIVE) {
+            queue.pollFirst().run();
+            spawnTimer = SPAWN_GAP;
+        }
+
+        /* Dalga bitti mi? */
+        if (queue.isEmpty()
+            && game.getGoblins().isEmpty()
+            && game.getDynaList().isEmpty()
+            && game.getBarrels().isEmpty()) {
+
+            if (currentWave >= waves.size()-1){
+                state = State.COMPLETED;
+                intervalActive = false;
+                EventBus.post(new GameEvent(GameEventType.GAME_COMPLETED,null));
+            } else {
+                state = State.INTERVAL;
+                intervalActive = true;
+                intervalTimer  = INTERVAL_LEN;
+            }
+        }
+    }
+
+    /* ========== INTERVAL ========== */
+    private void handleInterval(float dt){
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE))
+            intervalTimer = 0f;
+        intervalTimer -= dt;
+        if (intervalTimer <= 0f) startNextWave();
+    }
+
+    /* ========== EventBus ========== */
     @Override
-    public void onEvent(GameEvent e) {
-        if (e.getType() == GameEventType.WAVE_START_REQUEST && state == State.PRE_WAVE) {
+    public void onEvent(GameEvent e){
+        if (e.getType()==GameEventType.WAVE_START_REQUEST && state==State.PRE_WAVE)
             startNextWave();
-        }
     }
 
-    /* -------- yeni dalga -------- */
-    public void startNextWave() {
+    /* ========== yeni dalga ========== */
+    public void startNextWave(){
 
-        currentWave++;                              // indis güncel
-
-        if (currentWave >= waves.size()) return;    // güvenlik
+        currentWave++;
+        if (currentWave >= waves.size()) return;
 
         WaveSpec s = waves.get(currentWave);
-
         queue.clear();
-        enqueue(s.gob,    this::spawnGoblin);
-        enqueue(s.dyn,    this::spawnDyna);
+        enqueue(s.gob   , this::spawnGoblin);
+        enqueue(s.dyn   , this::spawnDyna);
         enqueue(s.barrel, this::spawnBarrel);
 
-        state = State.IN_WAVE;
+        counting   = true;     // 3-2-1-GO
+        countNum   = 3;
+        countTimer = 0f;
+        EventBus.post(new GameEvent(GameEventType.WAVE_COUNTDOWN,3));
+
+        state          = State.IN_WAVE;
         intervalActive = false;
-        spawnTimer = 0f;
-    }
-    private void enqueue(int n, Runnable job){
-        for (int i = 0; i < n; i++) queue.add(job);
+        spawnTimer     = SPAWN_GAP;  // GO! sonrası ilk spawn gecikmeli
     }
 
-    /* -------- spawn yardımcıları -------- */
-    private void spawnGoblin() {
+    private void enqueue(int n, Runnable r){ for(int i=0;i<n;i++) queue.add(r); }
+
+    /* ----- spawn helpers ----- */
+    private void spawnGoblin(){
         Vector2 p = randPos();
         game.addGoblin(factory.createGoblin(
-            game.getPlayer(),
-            game,
-            game.getGoblins(),
-            p.x, p.y,
-            game.getLoot()));
+            game.getPlayer(), game, game.getGoblins(), p.x, p.y, game.getLoot()));
     }
     private void spawnDyna(){
         Vector2 p = randPos();
         game.getDynaList().add(factory.createDynamiteGoblin(
-                game.getPlayer(), game.getDynaList(), game.getLoot(), p.x, p.y));
+            game.getPlayer(), game.getDynaList(), game.getLoot(), p.x, p.y));
+
     }
-    private void spawnBarrel() {
+    private void spawnBarrel(){
         Vector2 p = randPos();
         game.getBarrels().add(factory.createBarrelBomber(
             game.getPlayer(), game, game.getBarrels(), p.x, p.y));
@@ -154,6 +181,7 @@ public final class WaveManager implements GameEventListener {
         float w = game.getMap().getMapWidth()  - m*2;
         float h = game.getMap().getMapHeight() - m*2;
         return new Vector2(m + rng.nextFloat()*w,
-                m + rng.nextFloat()*h);
+            m + rng.nextFloat()*h);
     }
 }
+

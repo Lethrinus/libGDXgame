@@ -70,7 +70,7 @@ public class BarrelBomber {
                 boomT = 0;
 
                 if (core != null) {
-                    core.getCameraShake().shake(0.4f, 0.2f); // patlamayla aynı anda
+                    core.getCameraShake().shake(0.4f, 0.2f);
                 }
             }
             return;
@@ -79,7 +79,7 @@ public class BarrelBomber {
         if (exploding) {
             boomT += dt;
 
-            if (!damageApplied && boomT >= explodeA.getAnimationDuration() / 3f) { // patlama ortasında hasar uygula
+            if (!damageApplied && boomT >= explodeA.getAnimationDuration() / 3f) {
                 float dx = player.getX() - x;
                 float dy = player.getY() - baseY;
                 float dist = (float) Math.sqrt(dx * dx + dy * dy);

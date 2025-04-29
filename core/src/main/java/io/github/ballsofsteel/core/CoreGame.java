@@ -2,9 +2,12 @@ package io.github.ballsofsteel.core;
 
 import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.*;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.ballsofsteel.entity.*;
 import io.github.ballsofsteel.events.EventBus;
 import io.github.ballsofsteel.events.GameEvent;
@@ -26,6 +29,9 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private final OrthographicCamera cam = new OrthographicCamera();
     private TileMapRenderer map;
     private CameraShake cameraShake;
+    private Stage overlayStage;
+    private CountdownOverlay countdown;
+
     /* ---------- varlık listeleri ---------- */
     private Player player;
     private NPC    npc;
@@ -48,7 +54,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     /* ---------------------------------------------------------------------- */
     @Override
     public void create() {
-
+        Fonts.load();
         batch = new SpriteBatch();
         cam.setToOrtho(false, 21, 12.35f);
         //21, 12.35f
@@ -76,6 +82,15 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         /* Upgrade menüsü & dalga yöneticisi */
         upgradeMenu = new UpgradeMenu();
         waveManager = new WaveManager(this, factory);
+
+
+        overlayStage = new Stage(new ScreenViewport());   // yalnızca yazı için
+        BitmapFont bigFont = new BitmapFont();
+        bigFont.getData().setScale(1f);
+
+        countdown = new CountdownOverlay(0.7f);
+        overlayStage.addActor(countdown);
+
 
         /* Event dinleme */
         EventBus.register(this);
@@ -147,7 +162,11 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public void onEvent(GameEvent e) {
 
         GameEventType t = e.getType();
-
+        switch (e.getType()) {
+            case WAVE_COUNTDOWN:
+                int n = (Integer) e.getPayload();
+                countdown.showNumber(n);
+                break;}
         if (t == GameEventType.UPGRADE_MENU_REQUEST) {         // NPC → menü
             upgradeMenu.show(player);
 
@@ -203,10 +222,11 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         dynas.forEach(d -> d.render(batch));
         loot.forEach(g -> g.render(batch));
         batch.end();
+
     }
 
     private void renderHUD() {
-
+        float dt = Gdx.graphics.getDeltaTime();
         hud.drawHUD(player);
         goldUI.draw();
 
@@ -227,6 +247,11 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
                     g.getX(), g.getY() + .8f,
                     g.getHealth() / g.getMaxHealth(), true);
         }
+
+
+        overlayStage.act(dt);
+        overlayStage.draw();
+
         batch.end();
     }
 
@@ -260,6 +285,8 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         goblins .forEach(Goblin        ::dispose);
         dynas   .forEach(DynamiteGoblin::dispose);
         barrels .forEach(BarrelBomber  ::dispose);
+
+        Fonts.dispose();
     }
 
     /* ---------------------------------------------------------------------- */
