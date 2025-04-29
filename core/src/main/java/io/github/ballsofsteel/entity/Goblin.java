@@ -8,8 +8,11 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.core.CoreGame;
+import io.github.ballsofsteel.core.GridPathfinder;
+import io.github.ballsofsteel.core.TileMapRenderer;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Goblin {
@@ -50,6 +53,12 @@ public class Goblin {
     private float hp = MAX_HP;
     private Vector2 knock = new Vector2();
     private float redFlash = 0f;
+
+
+    private List<Vector2> path = new ArrayList<>();
+    private int      pathIdx = 0;
+    private float    pathTimer = 0f;        // throttle replanning
+    private static final float REPLAN_INTERVAL = 0.5f; // secs
 
     public Goblin(Player player, CoreGame game, List<Goblin> crowd,
                   float startX, float startY, List<GoldBag> loot) {
@@ -122,45 +131,66 @@ public class Goblin {
 
         float dx = player.getX()-x, dy = player.getY()-y;
         float dist = (float)Math.sqrt(dx*dx+dy*dy);
-
-        switch (st){
-
+        switch (st) {
             case MOVE:
                 if (dist < ATTACK_RADIUS && attackCD <= 0f) {
-
+                    // saldırıya geçince path’i sıfırla
                     st = ST.ATTACK;
-                    atkT = 0f;
-                    attackDone = false;
-                } else if (dist > ATTACK_RADIUS * 0.8f) {
+                    atkT = 0f; attackDone = false;
+                    path.clear();
+                    pathIdx = 0;
+                } else {
+                    ensurePath(game.getMap(), dt);
 
-                    float moveX = x + (dx / dist) * SPEED * dt;
-                    float moveY = y + (dy / dist) * SPEED * dt;
-                    float newDx = player.getX() - moveX;
-                    float newDy = player.getY() - moveY;
-                    float newDist = (float)Math.sqrt(newDx*newDx + newDy*newDy);
+                    if (pathIdx < path.size()) {
+                        Vector2 goal = path.get(pathIdx);
+                        float gdx  = goal.x - x, gdy = goal.y - y;
+                        float gdist = (float)Math.sqrt(gdx*gdx + gdy*gdy);
 
-                    if (newDist > ATTACK_RADIUS * 0.8f) {
+                        if (gdist < 0.1f) {
+                            pathIdx++;
+                        } else {
+                            float mv = SPEED * dt;
+                            float nx = x + (gdx/gdist)*mv;
+                            float ny = y + (gdy/gdist)*mv;
+                            if (canMoveTo(nx, ny)) {
+                                x = nx; y = ny;
+                            } else {
+                                pathTimer = 0f;
+                            }
+                            facingRight = gdx > 0;
+                            moveT += dt;
+                        }
 
-                        if (canMoveTo(moveX, moveY)) {
-                            x = moveX;
-                            y = moveY;
+                    } else {
+                        if (dist > ATTACK_RADIUS * 0.8f) {
+                            float mv = SPEED * dt;
+                            float nx = x + (dx/dist)*mv;
+                            float ny = y + (dy/dist)*mv;
+                            if (canMoveTo(nx, ny)) {
+                                x = nx; y = ny;
+                                facingRight = dx > 0;
+                                moveT += dt;
+                            } else {
+                                pathTimer = 0f;
+                            }
                         }
                     }
-                    facingRight = dx > 0;
                 }
-                moveT += dt;
                 break;
             case ATTACK:
                 atkT += dt;
-                if (!attackDone && atkT >= ATTACK_HIT_T){
-                    if (dist <= ATTACK_RADIUS){
-                        float ang = MathUtils.atan2(dy,dx)*MathUtils.radiansToDegrees;
+                if (!attackDone && atkT >= ATTACK_HIT_T) {
+                    if (dist <= ATTACK_RADIUS) {
+                        float ang = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
                         player.takeDamage(ATTACK_DMG, ATTACK_KB, ang);
                     }
                     attackDone = true;
                 }
-                if (atkT >= ATTACK_DUR){
-                    st = ST.MOVE; attackCD = ATTACK_CD; atkT=0f;
+                if (atkT >= ATTACK_DUR) {
+                    st = ST.MOVE;
+                    attackCD = ATTACK_CD;
+                    atkT = 0f;
                 }
                 break;
         }
@@ -227,7 +257,34 @@ public class Goblin {
 
         return !game.getMap().isCellBlocked((int)targetX, (int)targetY, poly);
     }
-    /* ---------- getter ---------- */
+
+    private void ensurePath(TileMapRenderer map, float dt) {
+        pathTimer -= dt;
+        if (pathTimer > 0 && pathIdx < path.size()) return;
+
+        int sx = (int)Math.floor(x), sy = (int)Math.floor(y);
+        int tx = (int)Math.floor(player.getX()), ty = (int)Math.floor(player.getY());
+
+        GridPathfinder pf = new GridPathfinder(map);
+        List<Vector2> newPath = pf.findPath(sx, sy, tx, ty);
+
+        // Başlangıç hücresinin ortasıysa kaldır, böylece geri adım atmaz
+        if (!newPath.isEmpty()) {
+            Vector2 first = newPath.get(0);
+            if (Math.abs(first.x - (sx + 0.5f)) < 0.01f &&
+                Math.abs(first.y - (sy + 0.5f)) < 0.01f) {
+                newPath.remove(0);
+            }
+        }
+
+        path = newPath;
+        pathIdx = 0;
+        pathTimer = REPLAN_INTERVAL;
+    }
+
+
+
+        /* ---------- getter ---------- */
     public float getX(){ return x; }  public float getY(){ return y; }
     public float getHealth(){ return hp; }  public float getMaxHealth(){ return MAX_HP; }
     public boolean isDead(){ return st==ST.DIE && deathAnim.isAnimationFinished(deathT); }

@@ -236,7 +236,7 @@
  </layer>
  <layer id="6" name="Building" width="64" height="64">
   <properties>
-   <property name="blocked" type="bool" value="false"/>
+   <property name="blocked" type="bool" value="true"/>
   </properties>
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,256,257,258,259,260,261,262,263,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
