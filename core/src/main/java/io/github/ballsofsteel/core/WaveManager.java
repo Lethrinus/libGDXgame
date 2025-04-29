@@ -35,7 +35,7 @@ public final class WaveManager implements GameEventListener {
     private final GameEntityFactory  factory;
     private final Random rng = new Random();
 
-    private static final int   MAX_ALIVE    = 222;
+    private static final int   MAX_ALIVE    = 8;
     private static final float INTERVAL_LEN = 30f;
     private static final float SPAWN_GAP    = 1.1f;
     private static final float COUNTDOWN_GAP= 1f;

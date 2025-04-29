@@ -23,7 +23,7 @@ public final class Fonts {
             new FreeTypeFontGenerator.FreeTypeFontParameter();
 
         // HUD (küçük)
-        prm.size = 48;                        // altın sayacı vs.
+        prm.size = 48;
         prm.minFilter = Texture.TextureFilter.Linear;
         prm.magFilter = Texture.TextureFilter.Linear;
         HUD = gen.generateFont(prm);

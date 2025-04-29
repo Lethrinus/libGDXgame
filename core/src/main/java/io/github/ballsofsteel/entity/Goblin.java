@@ -18,7 +18,6 @@ public class Goblin {
     private static final float SCALE          = 1f / 72f;
     private static final float SEPARATE_DIST2 = 0.40f;       // kare mesafe^2
     private static final float SPEED          = 2.2f;
-    private static final float ALERT_RADIUS   = 5.0f;
     private static final float ATTACK_RADIUS  = 1.0f;
     private static final float ATTACK_HIT_T   = 0.15f;
     private static final float ATTACK_DUR     = 0.7f;
@@ -27,7 +26,7 @@ public class Goblin {
     private static final float ATTACK_CD      = 0.9f;
     private static final float MAX_HP         = 50f;
     private static final float FLASH_TIME     = 0.2f;
-    private static final float GOLD_SPREAD    = .4f;
+    private static final float GOLD_SPREAD    = .8f;
 
     /* ---------- referanslar ---------- */
     private final Player player;

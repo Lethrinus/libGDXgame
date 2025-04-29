@@ -15,7 +15,7 @@ import io.github.ballsofsteel.events.GameEventListener;
 import io.github.ballsofsteel.events.GameEventType;
 import io.github.ballsofsteel.factory.GameEntityFactory;
 import io.github.ballsofsteel.ui.*;
-import io.github.ballsofsteel.ui.UpgradeMenu;
+import io.github.ballsofsteel.screen.UpgradeMenu;
 
 import java.util.*;
 

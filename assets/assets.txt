@@ -26,6 +26,8 @@ bubble.png
 deadanimation.atlas
 deadanimation.png
 fonts/Homer_Simpson_Revised.ttf
+goldbag_spawn.atlas
+goldbag_spawn.png
 libgdx.png
 maps/GoldMine_Active.tsx
 maps/Tilesets/Bridge.tsx

@@ -64,13 +64,13 @@ public class Player {
     // Dash fields.
     private boolean isDashing = false;
     private float dashTimeLeft = 0f;
-    private float dashSpeed = 10f;
-    private float dashDuration = 0.2f;
+    private float dashSpeed = 15f;
+    private float dashDuration = 0.3f;
     private float dashCooldown = 1.0f;
     private float dashCooldownTimer = 0f;
 
     // Ghost trail constants.
-    private static final float GHOST_INITIAL_ALPHA = 0.4f;
+    private static final float GHOST_INITIAL_ALPHA = 0.3f;
     private static final float GHOST_INITIAL_TIME = 0.15f;
 
     // Ghost trail container.
