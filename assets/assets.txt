@@ -95,6 +95,7 @@ maps/Tilesets/Images/Wood_Tower_Red.png
 maps/Tilesets/Images/Wood_Tower_Yellow.png
 maps/Tilesets/Korkuluk.tsx
 maps/Tilesets/Mushroom.tsx
+maps/Tilesets/Mushroom1.tsx
 maps/Tilesets/Pumpkin.tsx
 maps/Tilesets/Pumpkin2.tsx
 maps/Tilesets/Pumpkin3.tsx

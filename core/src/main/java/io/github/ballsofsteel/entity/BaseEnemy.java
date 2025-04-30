@@ -138,7 +138,6 @@ public abstract class BaseEnemy {
                                      float minDist2,
                                      float speed,
                                      float dt) {
-
         for (BaseEnemy other : crowd) {
             if (other == this) continue;
             float dx = x - other.x;
@@ -146,8 +145,13 @@ public abstract class BaseEnemy {
             float d2 = dx * dx + dy * dy;
             if (d2 < minDist2 && d2 > 0f) {
                 float d = (float) Math.sqrt(d2);
-                x += dx / d * dt * speed;
-                y += dy / d * dt * speed;
+                float pushX = x + dx / d * dt * speed;
+                float pushY = y + dy / d * dt * speed;
+                // ◄◄ İleri gitmeden önce kontrol et
+                if (canMoveTo(map, pushX, pushY)) {
+                    x = pushX;
+                    y = pushY;
+                }
             }
         }
     }

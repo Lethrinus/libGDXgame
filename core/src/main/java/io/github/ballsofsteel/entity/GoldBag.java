@@ -25,7 +25,7 @@ public class GoldBag {
         SPAWN_TEX.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         TextureRegion src = new TextureRegion(SPAWN_TEX, 2, 2, 896, 128);   // bounds
         TextureRegion[] frames = src.split(896 / 7, 128)[0];                // 7 kare
-        SPAWN_ANIM = new Animation<TextureRegion>(0.25f, frames);
+        SPAWN_ANIM = new Animation<TextureRegion>(0.15f, frames);
         SPAWN_ANIM.setPlayMode(Animation.PlayMode.NORMAL);
     }
 

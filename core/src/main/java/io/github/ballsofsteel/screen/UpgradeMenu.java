@@ -1,5 +1,6 @@
 package io.github.ballsofsteel.screen;
 
+import com.badlogic.gdx.Audio;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
@@ -75,7 +76,6 @@ public final class UpgradeMenu implements GameEventListener {
         title.setFontScale(1.4f);                        // büyük yazı
         title.setAlignment(Align.center);
         root.add(title).padBottom(40).center().row();
-
         addButton("1  :  +50 HEALTH", Upgrade.HEALTH);
         addButton("2  :  +50% DAMAGE", Upgrade.DAMAGE);
         addButton("3  :  +50% SPEED" , Upgrade.SPEED );

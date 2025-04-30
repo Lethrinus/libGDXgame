@@ -26,9 +26,9 @@ public final class WaveManager implements GameEventListener {
     }
 
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 10,10, 10),
-        new WaveSpec(12, 4, 0),
-        new WaveSpec(14, 5, 3),
+        new WaveSpec( 24,0, 0),
+        new WaveSpec(0, 1, 0),
+        new WaveSpec(0, 0, 1),
         new WaveSpec(18,10, 6)
     );
 
@@ -60,11 +60,8 @@ public final class WaveManager implements GameEventListener {
         game = g; factory = f;
         EventBus.register(this);
 
-        spawnManager.addSpawnPoint(60, 30);
-        spawnManager.addSpawnPoint(55, 10);
-        spawnManager.addSpawnPoint(55, 50);
-        spawnManager.addSpawnPoint(50, 60);
-        spawnManager.addSpawnPoint(60, 15);
+        spawnManager.addSpawnPoint(44, 25);
+
     }
 
 

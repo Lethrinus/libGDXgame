@@ -4,6 +4,7 @@ import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -16,6 +17,7 @@ import io.github.ballsofsteel.events.GameEventType;
 import io.github.ballsofsteel.factory.GameEntityFactory;
 import io.github.ballsofsteel.ui.*;
 import io.github.ballsofsteel.screen.UpgradeMenu;
+import io.github.ballsofsteel.screen.PauseManager;
 
 import java.util.*;
 
@@ -31,7 +33,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private CameraShake cameraShake;
     private Stage overlayStage;
     private CountdownOverlay countdown;
-
+    private PauseManager pauseManager;
     /* ---------- varlık listeleri ---------- */
     private Player player;
     private NPC    npc;
@@ -56,7 +58,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public void create() {
         Fonts.load();
         batch = new SpriteBatch();
-        cam.setToOrtho(false, 21, 12.35f);
+        cam.setToOrtho(false, 55, 55f);
         //21, 12.35f
 
         map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
@@ -84,9 +86,29 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         waveManager = new WaveManager(this, factory);
 
 
-        overlayStage = new Stage(new ScreenViewport());   // yalnızca yazı için
+        overlayStage = new Stage(new ScreenViewport());   // önce stage oluştur
         BitmapFont bigFont = new BitmapFont();
         bigFont.getData().setScale(1f);
+        countdown = new CountdownOverlay(0.7f);
+        overlayStage.addActor(countdown);
+
+// PAUSE MANAGER'I overlayStage'den sonra oluştur
+        TextureAtlas pauseAtlas = new TextureAtlas("UI/mainmenu_ui.atlas");
+        pauseManager = new PauseManager((Game) Gdx.app.getApplicationListener(), new InputMultiplexer(), pauseAtlas);
+
+// InputMultiplexer'a tüm inputları ekle
+        InputMultiplexer multiplexer = new InputMultiplexer();
+        multiplexer.addProcessor(pauseManager.getStage());  // pause menüsü
+        multiplexer.addProcessor(overlayStage);             // geri sayım sahnesi
+        multiplexer.addProcessor(new InputAdapter() {
+            @Override
+            public boolean scrolled(float dx, float dy) {
+                if (dy > 0) hud.nextSlot(); else if (dy < 0) hud.prevSlot();
+                return true;
+            }
+        });
+        Gdx.input.setInputProcessor(multiplexer);
+
 
         countdown = new CountdownOverlay(0.7f);
         overlayStage.addActor(countdown);
@@ -112,6 +134,13 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     @Override
     public void render() {
         float dt = Gdx.graphics.getDeltaTime();
+        pauseManager.update();
+        if (pauseManager.isPaused()) {
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+            renderWorld();
+            pauseManager.render();
+            return;
+        }
 
         handleInput(dt);
 
