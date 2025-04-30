@@ -118,8 +118,6 @@ public class Player {
     private float attackDamage = 20f;
     private float attackKnockbackForce = 4f;
     private float attackRange = 1.5f;
-    float dmg = attackDamage * damageMultiplier;
-    float moveSpee = (isDashing? dashSpeed : speed*speedMultiplier);
     public float getX() { return x; }
     public float getY() { return y; }
     public float getHealth() { return health; }
@@ -391,14 +389,14 @@ public class Player {
                 /* dinamit goblin */
                 for (DynamiteGoblin dg : core.getDynaList()) {
                     if (withinAttackCone(dg.getX(), dg.getY()))
-                        dg.takeDamage(attackDamage, attackKnockbackForce,
+                        dg.takeDamage(attackDamage * damageMultiplier, attackKnockbackForce,
                             angleDegTo(dg.getX(), dg.getY()));
                 }
 
                 /* normal goblin */
                 for (Goblin g : core.getGoblins()) {
                     if (withinAttackCone(g.getX(), g.getY()))
-                        g.takeDamage(attackDamage, attackKnockbackForce,
+                        g.takeDamage(attackDamage * damageMultiplier, attackKnockbackForce,
                             angleDegTo(g.getX(), g.getY()));
                 }
                 attackExecuted = true;
@@ -408,7 +406,7 @@ public class Player {
          else {
             // Store old position.
             float oldX = x, oldY = y;
-            float moveSpeed = isDashing ? dashSpeed : speed;
+            float moveSpeed = isDashing ? dashSpeed : speed * speedMultiplier;
             x += dx * moveSpeed * delta;
             y += dy * moveSpeed * delta;
 

@@ -76,9 +76,9 @@ public final class UpgradeMenu implements GameEventListener {
         title.setAlignment(Align.center);
         root.add(title).padBottom(40).center().row();
 
-        addButton("1  :  +30 HEALTH", Upgrade.HEALTH);
-        addButton("2  :  +20% DAMAGE", Upgrade.DAMAGE);
-        addButton("3  :  +10% SPEED" , Upgrade.SPEED );
+        addButton("1  :  +50 HEALTH", Upgrade.HEALTH);
+        addButton("2  :  +50% DAMAGE", Upgrade.DAMAGE);
+        addButton("3  :  +50% SPEED" , Upgrade.SPEED );
 
         root.pack();
         root.setPosition(
@@ -139,9 +139,9 @@ public final class UpgradeMenu implements GameEventListener {
     private enum Upgrade{HEALTH,DAMAGE,SPEED}
     private void apply(Upgrade u){
         switch(u){
-            case HEALTH: player.increaseHealth(30f);        break;
-            case DAMAGE: player.increaseAttackDamage(4f); break;
-            case SPEED : player.increaseMoveSpeed(2f);    break;
+            case HEALTH: player.increaseHealth(50f);        break;
+            case DAMAGE: player.increaseAttackDamage(1.5f); break;
+            case SPEED : player.increaseMoveSpeed(1.5f);    break;
         }
         EventBus.post(new GameEvent(GameEventType.UPGRADE_SELECTED, u.name()));
         hide();

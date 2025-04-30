@@ -159,6 +159,15 @@ public class TileMapRenderer {
                 }
             }
         }
+        TiledMapTileLayer buildingLayer = (TiledMapTileLayer) map.getLayers().get(LAYER_BUILDINGS);
+        if (buildingLayer != null) {
+            Object prop = buildingLayer.getProperties().get("blocked");
+            if (prop != null && Boolean.parseBoolean(prop.toString())) {
+                TiledMapTileLayer.Cell cell = buildingLayer.getCell(tileX, tileY);
+                if (cell != null && cell.getTile() != null) return true;
+            }
+        }
+
 
         // Sonra normal Collision layer'a bak
         TiledMapTileLayer col = (TiledMapTileLayer) map.getLayers().get(LAYER_COLLISION);

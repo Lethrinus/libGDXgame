@@ -25,17 +25,8 @@ public final class WaveManager implements GameEventListener {
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
 
-    private final List<Vector2> spawnPoints = Arrays.asList(
-        new Vector2(60, 30),
-        new Vector2(55, 10),
-        new Vector2(55, 50),
-        new Vector2(50, 60),
-        new Vector2(60, 15)
-    );
-
-
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 0, 0, 0),
+        new WaveSpec( 10,10, 10),
         new WaveSpec(12, 4, 0),
         new WaveSpec(14, 5, 3),
         new WaveSpec(18,10, 6)

@@ -32,9 +32,9 @@ public class ShaderManager {
             "    vec4 color = texture2D(u_texture, v_texCoord);\n" +
             "    float dist = distance(gl_FragCoord.xy, u_playerScreenPos);\n" +
             "    // Invert the smoothstep factor so that near the player, factor=1 (dark) and far, factor=0 (normal)\n" +
-            "    float factor = 1.0 - smoothstep(u_radius, u_radius + 50.0, dist);\n" +
+            "    float factor = 1.0 - smoothstep(u_radius, u_radius + 30.0, dist);\n" +
             "    // Mix between full brightness and 0.3 brightness based on factor\n" +
-            "    vec4 darkened = color * mix(1.0, 0.3, factor);\n" +
+            "    vec4 darkened = color * mix(1.0, 0.9, factor);\n" +
             "    gl_FragColor = darkened;\n" +
             "}";
 

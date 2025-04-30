@@ -198,31 +198,32 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     }
 
     private void renderWorld() {
+        map.renderBase(); // Ground + Building + Water + Collision
 
-        map.renderBase();                        // Ground + Building
+        // Çalıları çiz (eğer shader kullanmak istiyorsan ikinci parametre true)
         map.renderBush(player, 50f, player.isInBush());
-        /* goblin (ağaç altı) */
+
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
+
+        // ALTTA KALACAK VARLIKLAR
         goblins.forEach(g -> g.render(batch));
         dynas.forEach(d -> d.render(batch));
         barrels.forEach(b -> b.render(batch));
-        loot  .forEach(g -> g.render(batch));
-        batch.end();
-
-        map.renderTreeTop(player, 90f,
-            map.isCellTreeTop((int)player.getX(), (int)player.getY()));
-
-        /* oyuncu + diğer varlıklar */
-        batch.begin();
-        player.render(batch);
-        npc.render(batch, new Vector2(player.getX(), player.getY()));
-        barrels.forEach(b -> b.render(batch));
-        dynas.forEach(d -> d.render(batch));
         loot.forEach(g -> g.render(batch));
+
+        // NPC önce çizilirse, player onun üstüne çıkabilir
+        npc.render(batch, new Vector2(player.getX(), player.getY()));
+
+        // PLAYER HER ZAMAN EN SON
+        player.render(batch);
+
         batch.end();
 
+        // AĞAÇLAR EN SON — Shader varsa burada yarı saydam geçişli olur
+        map.renderTreeTop(player, 90f, map.isCellTreeTop((int)player.getX(), (int)player.getY()));
     }
+
 
     private void renderHUD() {
         float dt = Gdx.graphics.getDeltaTime();
