@@ -59,6 +59,6 @@ public class GameEntityFactory implements EntityFactory {
     }
 
     @Override public NPC createNPC(CoreGame game, float x,float y,String[] lines){
-        return new NPC(x,y,lines);
+        return new NPC(game,x,y,lines);
     }
 }

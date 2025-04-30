@@ -75,8 +75,8 @@ public class DynamiteGoblin extends BaseEnemy {
 
         /* ----- hareket ----- */
         if(dist<KEEP){                        // kaç
-            tryMove(x - dx/dist*SPEED*dt*1.3f,
-                y - dy/dist*SPEED*dt*1.3f, dt);
+            tryMove(x - dx/dist*SPEED*dt*0.8f,
+                y - dy/dist*SPEED*dt*0.8f, dt);
 
         } else if(dist>THROW){                // yaklaş
             movePath(player.getX(),player.getY(),dt);

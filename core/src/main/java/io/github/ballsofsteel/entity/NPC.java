@@ -15,9 +15,6 @@ import io.github.ballsofsteel.events.EventBus;
 import io.github.ballsofsteel.events.GameEvent;
 import io.github.ballsofsteel.events.GameEventType;
 
-/**
- * NPC class with idle animation, typewriter dialogue effect, and player-centered pointer.
- */
 public class NPC {
 
     private float x, y;
@@ -30,12 +27,9 @@ public class NPC {
     private String[] dialogues;
     private int currentLineIndex = 0;
     private boolean inDialogue = false;
-
-
-    private boolean interacted = false;
+    private boolean showPointer = true;
 
     private boolean finishedDialogue = false;
-
 
     private float typedSpeed = 20f;
     private float typedTimer = 0f;
@@ -51,10 +45,13 @@ public class NPC {
     private float stateTime = 0f;
 
     private float lastDistance = Float.MAX_VALUE;
-    private static final float POINTER_DISTANCE = 1f;
+    private static final float POINTER_DISTANCE = 1.2f;
     private static boolean firstWaveStarted = false;
 
-    public NPC(float x, float y, String[] dialogues) {
+    private CoreGame game;
+
+    public NPC(CoreGame game, float x, float y, String[] dialogues) {
+        this.game = game;
         this.x = x;
         this.y = y;
         this.dialogues = dialogues;
@@ -87,12 +84,15 @@ public class NPC {
         lastDistance = dist;
 
         if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            if (finishedDialogue) {
-                return; // ◄◄ Eğer konuşma bittiyse bir daha konuşamazsın!
-            }
 
+            // Interval aktifse upgrade menüsünü göster
             if (firstWaveStarted && isIntervalActive()) {
                 EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
+                return;
+            }
+
+            // İlk diyalog tamamlandıysa ve interval değilse tekrar konuşamaz
+            if (finishedDialogue && !isIntervalActive()) {
                 return;
             }
 
@@ -109,6 +109,7 @@ public class NPC {
                     if (currentLineIndex >= dialogues.length) {
                         inDialogue = false;
                         finishedDialogue = true;
+
                         if (!firstWaveStarted) {
                             firstWaveStarted = true;
                             EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
@@ -149,7 +150,7 @@ public class NPC {
         float dy = y - playerPos.y;
         float distToPlayer = (float)Math.sqrt(dx * dx + dy * dy);
 
-        if (distToPlayer > 4f) {
+        if (distToPlayer > 2f && showPointer) {
             float angleDeg = MathUtils.atan2(dy, dx) * MathUtils.radiansToDegrees;
             float dirX = MathUtils.cosDeg(angleDeg);
             float dirY = MathUtils.sinDeg(angleDeg);
@@ -160,8 +161,8 @@ public class NPC {
             float pointerW = pointerTexture.getWidth() * (1f / 48f);
             float pointerH = pointerTexture.getHeight() * (1f / 48f);
 
-            float alpha = MathUtils.clamp((distToPlayer - 4f) / 6f, 0f, 1f);
-            float pulse = 1f + 0.05f * MathUtils.sin(stateTime * 3f);
+            float alpha = MathUtils.clamp((distToPlayer - 2f) / 6f, 0f, 1f);
+            float pulse = 1f + 0.25f * MathUtils.sin(stateTime * 5f);
 
             batch.setColor(1f, 1f, 1f, alpha);
             batch.draw(pointerTexture,
@@ -215,13 +216,11 @@ public class NPC {
     public float getX() { return x; }
     public float getY() { return y; }
 
-    private boolean isIntervalActive() {
+    public void setPointerVisible(boolean visible) { this.showPointer = visible; }
+    public boolean isPointerVisible() { return showPointer; }
 
-        return false;
-    }
-    public boolean interact() {
-        if (interacted) return false;  // bir kere konuştuktan sonra bir daha konuşma
-        interacted = true;
-        return true;
+    /** Dummy – gerçek interval durumunu WaveManager'dan almalısın */
+    private boolean isIntervalActive() {
+        return game != null && game.isIntervalActive();
     }
 }

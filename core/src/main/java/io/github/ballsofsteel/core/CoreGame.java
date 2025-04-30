@@ -118,13 +118,12 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         if (!upgradeMenu.isVisible()) {
             player.update(dt);
             npc.update(dt, new Vector2(player.getX(), player.getY()));
-            goblins.forEach(g -> g.update(dt));
-            dynas.removeIf(d -> { d.update(dt); return d.isDead(); });
+            goblins.removeIf(g -> { g.update(dt); return g.isDead(); });
+            dynas  .removeIf(d -> { d.update(dt); return d.isDead(); });
             barrels.removeIf(b -> { b.update(dt); return b.isFinished(); });
 
             updateLoot();
             waveManager.update(dt);
-
 
             updateCamera(dt);
             cameraShake.update(dt);
@@ -297,9 +296,11 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public List<BarrelBomber>   getBarrels()  { return barrels;  }
     public List<GoldBag>        getLoot()     { return loot;     }
     public Player               getPlayer()   { return player;   }
+    public NPC                  getNpc()        { return npc; }
     public TileMapRenderer      getMap()      { return map;      }
-    public CameraShake getCameraShake()       { return cameraShake;
-    }
+    public CameraShake getCameraShake()       { return cameraShake;}
+    public boolean isIntervalActive() { return WaveManager.isIntervalActive();}
+
 
     public void addGoblin(Goblin g) { goblins.add(g); }
 }

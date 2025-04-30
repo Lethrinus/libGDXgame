@@ -2,6 +2,7 @@ package io.github.ballsofsteel.core;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.entity.*;
 import io.github.ballsofsteel.events.*;
@@ -17,14 +18,24 @@ public final class WaveManager implements GameEventListener {
 
     private static boolean intervalActive = false;
     public  static boolean isIntervalActive() { return intervalActive; }
-
+    private final SpawnManager spawnManager = new SpawnManager();
     /* ---------- dalga şablonu ---------- */
     private static final class WaveSpec {
         final int gob, dyn, barrel;
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
+
+    private final List<Vector2> spawnPoints = Arrays.asList(
+        new Vector2(60, 30),
+        new Vector2(55, 10),
+        new Vector2(55, 50),
+        new Vector2(50, 60),
+        new Vector2(60, 15)
+    );
+
+
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 5, 5, 5),
+        new WaveSpec( 0, 0, 0),
         new WaveSpec(12, 4, 0),
         new WaveSpec(14, 5, 3),
         new WaveSpec(18,10, 6)
@@ -35,10 +46,13 @@ public final class WaveManager implements GameEventListener {
     private final GameEntityFactory  factory;
     private final Random rng = new Random();
 
-    private static final int   MAX_ALIVE    = 8;
+
+
+    private static final int   MAX_ALIVE    = 12;
     private static final float INTERVAL_LEN = 30f;
-    private static final float SPAWN_GAP    = 1.1f;
+    private static final float SPAWN_GAP    = 1.3f;
     private static final float COUNTDOWN_GAP= 1f;
+
 
     private int   currentWave  = -1;
     private float intervalTimer= 0f;
@@ -54,7 +68,14 @@ public final class WaveManager implements GameEventListener {
     public WaveManager(CoreGame g, GameEntityFactory f){
         game = g; factory = f;
         EventBus.register(this);
+
+        spawnManager.addSpawnPoint(60, 30);
+        spawnManager.addSpawnPoint(55, 10);
+        spawnManager.addSpawnPoint(55, 50);
+        spawnManager.addSpawnPoint(50, 60);
+        spawnManager.addSpawnPoint(60, 15);
     }
+
 
     /* ======================== update ======================== */
     public void update(float dt) {
@@ -115,6 +136,7 @@ public final class WaveManager implements GameEventListener {
                 state = State.INTERVAL;
                 intervalActive = true;
                 intervalTimer  = INTERVAL_LEN;
+                game.getNpc().setPointerVisible(true);
             }
         }
     }
@@ -153,35 +175,31 @@ public final class WaveManager implements GameEventListener {
 
         state          = State.IN_WAVE;
         intervalActive = false;
-        spawnTimer     = SPAWN_GAP;  // GO! sonrası ilk spawn gecikmeli
+        spawnTimer     = SPAWN_GAP;  //
+
+        game.getNpc().setPointerVisible(false);
     }
 
     private void enqueue(int n, Runnable r){ for(int i=0;i<n;i++) queue.add(r); }
 
     /* ----- spawn helpers ----- */
     private void spawnGoblin(){
-        Vector2 p = randPos();
-        game.addGoblin(factory.createGoblin(
-            game.getPlayer(), game, game.getGoblins(), p.x, p.y, game.getLoot()));
+        Vector2 spawn = spawnManager.getRandomSpawnPoint();
+        game.getGoblins().add(factory.createGoblin(
+            game.getPlayer(), game, game.getGoblins(), spawn.x, spawn.y, game.getLoot()));
     }
+
     private void spawnDyna(){
-        Vector2 p = randPos();
+        Vector2 spawn = spawnManager.getRandomSpawnPoint();
         game.getDynaList().add(factory.createDynamiteGoblin(
-            game.getPlayer(),  game, game.getDynaList(), game.getLoot(), p.x, p.y));
-
+            game.getPlayer(), game, game.getDynaList(), game.getLoot(), spawn.x, spawn.y));
     }
+
     private void spawnBarrel(){
-        Vector2 p = randPos();
+        Vector2 spawn = spawnManager.getRandomSpawnPoint();
         game.getBarrels().add(factory.createBarrelBomber(
-            game.getPlayer(), game, game.getBarrels(), p.x, p.y));
+            game.getPlayer(), game, game.getBarrels(), spawn.x, spawn.y));
     }
 
-    private Vector2 randPos(){
-        float m = 2f;
-        float w = game.getMap().getMapWidth()  - m*2;
-        float h = game.getMap().getMapHeight() - m*2;
-        return new Vector2(m + rng.nextFloat()*w,
-            m + rng.nextFloat()*h);
-    }
 }
 
