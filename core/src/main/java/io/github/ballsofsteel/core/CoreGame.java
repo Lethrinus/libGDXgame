@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.ballsofsteel.entity.*;
 import io.github.ballsofsteel.events.EventBus;
@@ -16,6 +17,7 @@ import io.github.ballsofsteel.events.GameEvent;
 import io.github.ballsofsteel.events.GameEventListener;
 import io.github.ballsofsteel.events.GameEventType;
 import io.github.ballsofsteel.factory.GameEntityFactory;
+import io.github.ballsofsteel.screen.GameOverScreen;
 import io.github.ballsofsteel.ui.*;
 import io.github.ballsofsteel.screen.UpgradeMenu;
 import io.github.ballsofsteel.screen.PauseManager;
@@ -54,6 +56,14 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private final GameEntityFactory factory = new GameEntityFactory();
     private WaveManager waveManager;
     private ShaderProgram grayscaleShader;
+
+
+    private boolean playerDead = false;
+    private float deathTimer = 0f;
+    private float deathAnimDuration = 2.1f; // Set this to your death animation's duration
+    private float deathZoomStart = 1.0f;
+    private float deathZoomEnd = 1.5f; // How much to zoom in
+
 
     /* ---------------------------------------------------------------------- */
     /*  create                                                                */
@@ -159,57 +169,127 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     @Override
     public void render() {
         float dt = Gdx.graphics.getDeltaTime();
+
+        // 1) Update pause state
         pauseManager.update();
+
+        // 2) If paused — draw everything in full grayscale, then your pause UI, and return
         if (pauseManager.isPaused()) {
-            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-            // Set grayscale shader for map rendering (base + treetop)
-            map.renderer.getBatch().setShader(grayscaleShader);
-            map.renderBase();
-            map.renderTreeTop(player, 90f, map.isCellTreeTop((int)player.getX(), (int)player.getY()));
-            map.renderer.getBatch().setShader(null);
-
-            // Set grayscale shader for entities
-            batch.setShader(grayscaleShader);
-            batch.setProjectionMatrix(cam.combined);
-            batch.begin();
-            goblins.forEach(g -> g.render(batch));
-            dynas.forEach(d -> d.render(batch));
-            barrels.forEach(b -> b.render(batch));
-            loot.forEach(g -> g.render(batch));
-            npc.render(batch, new Vector2(player.getX(), player.getY()));
-            player.render(batch);
-            batch.end();
-            batch.setShader(null);
-
-            // Render HUD and pause menu in color
-            renderHUD();
+            renderPausedState();     // ← now actually applies grayscale!
             pauseManager.render();
-
             return;
         }
 
+        // 3) Normal “alive” or “death” logic
+        player.update(dt);
+
+        if (!playerDead && player.getHealth() <= 0f) {
+            playerDead     = true;
+            deathTimer     = 0f;
+            deathZoomStart = cam.zoom;
+            deathZoomEnd   = 0.5f;
+        }
+
+        if (playerDead) {
+            deathTimer += dt;
+            float t = MathUtils.clamp(deathTimer / deathAnimDuration, 0f, 1f);
+            cam.zoom = MathUtils.lerp(deathZoomStart, deathZoomEnd, t);
+            cam.update();
+
+            renderDeathState(dt);
+
+            if (deathTimer >= deathAnimDuration) {
+                Pixmap pix = ScreenUtils.getFrameBufferPixmap(0, 0,
+                    Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+                Texture snap = new Texture(pix); pix.dispose();
+                snap.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+                Game g = (Game)Gdx.app.getApplicationListener();
+                g.setScreen(new GameOverScreen(g, snap));
+            }
+            return;
+        }
+
+        // 4) Fully running game
         handleInput(dt);
-
         if (!upgradeMenu.isVisible()) {
-            player.update(dt);
             npc.update(dt, new Vector2(player.getX(), player.getY()));
-            goblins.removeIf(g -> { g.update(dt); return g.isDead(); });
-            dynas  .removeIf(d -> { d.update(dt); return d.isDead(); });
-            barrels.removeIf(b -> { b.update(dt); return b.isFinished(); });
-
+            goblins .removeIf(e -> { e.update(dt); return e.isDead(); });
+            dynas   .removeIf(d -> { d.update(dt); return d.isDead(); });
+            barrels .removeIf(b -> { b.update(dt); return b.isFinished(); });
             updateLoot();
             waveManager.update(dt);
-
             updateCamera(dt);
             cameraShake.update(dt);
         }
 
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
         renderWorld();
         renderHUD();
         upgradeMenu.render(batch);
+    }
+
+    /** Draws the entire world+entities in full grayscale when paused. */
+    private void renderPausedState() {
+        // clear first
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        // 1) bind grayscale shader and set uniform to full (1.0)
+        grayscaleShader.begin();
+        grayscaleShader.setUniformf("u_grayscaleFactor", 1f);
+
+        // 2) draw map with shader
+        ShaderProgram oldShader = map.renderer.getBatch().getShader();
+        map.renderer.getBatch().setShader(grayscaleShader);
+        map.renderBase();
+        map.renderTreeTop(player, 90f, map.isCellTreeTop(
+            (int)player.getX(), (int)player.getY()));
+        map.renderer.getBatch().setShader(oldShader);
+
+        // 3) draw entities with shader
+        SpriteBatch sb = batch;
+        sb.setShader(grayscaleShader);
+        sb.setProjectionMatrix(cam.combined);
+        sb.begin();
+        goblins .forEach(g -> g.render(sb));
+        dynas   .forEach(d -> d.render(sb));
+        barrels .forEach(b -> b.render(sb));
+        loot    .forEach(l -> l.render(sb));
+        npc     .render(sb, new Vector2(player.getX(), player.getY()));
+        player  .render(sb);
+        sb.end();
+
+        // 4) unbind
+        grayscaleShader.end();
+        sb.setShader(null);
+    }
+
+
+
+    private void renderDeathState(float dt) {
+        deathTimer += dt;
+        float grayscaleIntensity = Math.min(deathTimer / deathAnimDuration, 1f);
+
+        // 1) bind & set the uniform
+        grayscaleShader.begin();
+        grayscaleShader.setUniformf("u_grayscaleFactor", grayscaleIntensity);
+
+        // 2) draw your map + entities
+        map.renderer.getBatch().setShader(grayscaleShader);
+        map.renderBase();
+        map.renderTreeTop(player, 90f, map.isCellTreeTop((int)player.getX(), (int)player.getY()));
+
+        batch.setProjectionMatrix(cam.combined);
+        batch.setShader(grayscaleShader);
+        batch.begin();
+        goblins.forEach(g -> g.render(batch));
+        // … etc …
+        player.render(batch);
+        batch.end();
+
+        // 3) unbind
+        grayscaleShader.end();
+        batch.setShader(null);
     }
 
     /* ---------------------------------------------------------------------- */

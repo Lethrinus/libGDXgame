@@ -26,12 +26,12 @@ public final class WaveManager implements GameEventListener {
     }
 
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 0,0, 0),
-        new WaveSpec(0, 0, 0),
-        new WaveSpec(0, 0, 0),
-        new WaveSpec(1,0, 0),
-         new WaveSpec(0,0, 0),
-        new WaveSpec(0,0, 0)
+        new WaveSpec( 4,0, 0),
+        new WaveSpec(4, 0, 0),
+        new WaveSpec(4, 0, 0),
+        new WaveSpec(4,0, 0),
+         new WaveSpec(4,0, 0),
+        new WaveSpec(4,0, 0)
     );
 
     /* ---------- referans / sayaç ---------- */

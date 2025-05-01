@@ -46,6 +46,10 @@ public class Player {
     private int  lastDir = 0;        // 0=R,1=U,2=L,3=D  (son saldırı yönü)
     private boolean useSecond = false;
 
+    private Animation<TextureRegion> deathAnimation;
+    private float deathStateTime = 0f;
+    private boolean isDead = false;
+
     private Animation<TextureRegion> healAnimation;
     private Texture healTexture;
     private float healStateTime = 0f;
@@ -135,7 +139,7 @@ public class Player {
         this.camera = camera;
         this.core = core;
         this.tileMapRenderer = tileMapRenderer;
-        this.health = 100f;
+        this.health = 1f;
         this.maxHealth = 100f;
         this.inventory = new Inventory();
         atlas = new Texture(Gdx.files.internal("Player/knight_atlas.png"));
@@ -155,7 +159,11 @@ public class Player {
         healAnimation = new Animation<TextureRegion>(0.1f, healFrames);
         healAnimation.setPlayMode(Animation.PlayMode.NORMAL);
 
-        // ▼▼ ctor içinde atlas region’larını tanımladığın kısmı TAMAMEN değiştir ▼▼
+
+        Texture deathRegion  = new Texture(Gdx.files.internal("deadanimation.png"));
+        deathAnimation = BaseEnemy.row(deathRegion, 2,   2, 1792,128,14,0.075f);
+
+
         TextureRegion idleRegion  = new TextureRegion(atlas, 2,     2, 1152,192);
         TextureRegion runRRegion  = new TextureRegion(atlas, 2,  1360, 1152,192);
 
@@ -317,6 +325,14 @@ public class Player {
             if (healAnimation.isAnimationFinished(healStateTime)) {
                 isHealing = false;
             }
+        }
+        if (isDead) {
+            deathStateTime += delta;
+            return; // Skip normal update logic when dead
+        }
+        if (health <= 0 && !isDead) {
+            isDead = true;
+            deathStateTime = 0f;
         }
         // Process movement input.
         float dx = 0, dy = 0;
@@ -521,40 +537,45 @@ public class Player {
 
 
     public void render(SpriteBatch batch) {
-        // Determine current frame based on whether attacking or moving.
-        TextureRegion frame = isAttacking ? currentAttackAnim.getKeyFrame(attackStateTime)
-            : currentMovementAnim.getKeyFrame(movementStateTime);
+        TextureRegion frame;
+        if (isDead) {
+            frame = deathAnimation.getKeyFrame(deathStateTime, false);
+        } else {
+            frame = isAttacking ? currentAttackAnim.getKeyFrame(attackStateTime)
+                : currentMovementAnim.getKeyFrame(movementStateTime);
+        }
         float drawW = frame.getRegionWidth() * scale;
         float drawH = frame.getRegionHeight() * scale;
 
-        // Render ghost trail.
-        for (GhostFrame ghost : ghosts) {
-            float w = ghost.region.getRegionWidth() * scale;
-            float h = ghost.region.getRegionHeight() * scale;
-            batch.setColor(1f, 1f, 1f, ghost.alpha);
-            batch.draw(ghost.region, ghost.x - w / 2f, ghost.y - h / 2f, w, h);
-        }
-        batch.setColor(1, 1, 1, 1);
-
-        // Render the player sprite.
-        batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
-
-        // Render heal effect centered on the player.
-        if (isHealing) {
-            TextureRegion healFrame = healAnimation.getKeyFrame(healStateTime);
-            float healW = healFrame.getRegionWidth() * healScale;
-            float healH = healFrame.getRegionHeight() * healScale;
-            batch.draw(healFrame, x - healW / 2f, y - healH / 2f, healW, healH);
-        }
-
-        // Render red flash effect if damaged.
-        if (redFlashTimer > 0) {
-            batch.setColor(1, 0, 0, 0.3f);
-            batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
+        // Render ghost trail (optional, can skip if dead)
+        if (!isDead) {
+            for (GhostFrame ghost : ghosts) {
+                float w = ghost.region.getRegionWidth() * scale;
+                float h = ghost.region.getRegionHeight() * scale;
+                batch.setColor(1f, 1f, 1f, ghost.alpha);
+                batch.draw(ghost.region, ghost.x - w / 2f, ghost.y - h / 2f, w, h);
+            }
             batch.setColor(1, 1, 1, 1);
         }
-    }
 
+        // Render the player sprite (death or normal)
+        batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
+
+        // Render heal effect and red flash as before (optional, can skip if dead)
+        if (!isDead) {
+            if (isHealing) {
+                TextureRegion healFrame = healAnimation.getKeyFrame(healStateTime);
+                float healW = healFrame.getRegionWidth() * healScale;
+                float healH = healFrame.getRegionHeight() * healScale;
+                batch.draw(healFrame, x - healW / 2f, y - healH / 2f, healW, healH);
+            }
+            if (redFlashTimer > 0) {
+                batch.setColor(1, 0, 0, 0.3f);
+                batch.draw(frame, x - drawW / 2f, y - drawH / 2f, drawW, drawH);
+                batch.setColor(1, 1, 1, 1);
+            }
+        }
+    }
     // Getter methods for dash cooldown UI.
 
 
