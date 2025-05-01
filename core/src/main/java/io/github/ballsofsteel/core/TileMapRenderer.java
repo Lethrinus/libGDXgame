@@ -24,7 +24,7 @@ public class TileMapRenderer {
     private static final String LAYER_WATER         = "Water";
 
     private final TiledMap map;
-    private final OrthogonalTiledMapRenderer renderer;
+    final OrthogonalTiledMapRenderer renderer;
     private final OrthographicCamera camera;
 
     private final float unitScale;

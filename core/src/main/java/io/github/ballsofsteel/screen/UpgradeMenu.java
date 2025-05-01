@@ -1,8 +1,9 @@
 package io.github.ballsofsteel.screen;
 
-import com.badlogic.gdx.Audio;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
@@ -13,22 +14,37 @@ import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import io.github.ballsofsteel.core.WaveManager;
 import io.github.ballsofsteel.entity.Player;
-import io.github.ballsofsteel.events.*;
+import io.github.ballsofsteel.events.GameEvent;
+import io.github.ballsofsteel.events.GameEventType;
+import io.github.ballsofsteel.events.EventBus;
 import io.github.ballsofsteel.ui.Fonts;
 
-/** Basit ama şık yükseltme menüsü – getLabel() kullanılmaz. */
-public final class UpgradeMenu implements GameEventListener {
+import java.util.*;
+import java.util.List;
+
+public final class UpgradeMenu {
 
     private final Stage stage;
-    private final Skin  skin;
-    private Window  root;
+    private final Skin skin;
+    private Window root;
+    private Table upgradeTable;
+    private Label goldLabel;
+    private Label errorLabel;
 
     private boolean visible = false;
-    private Player  player;
+    private Player player;
+    private int currentWave = 0;
+
+    private float inputDelayTimer = 0f;
+    private boolean blockKeyboard = true;
+    private float errorMessageTimer = 0f;
+    private InputProcessor previousInputProcessor;
+    // Wave-specific upgrades with costs
+    private final Map<Integer, List<UpgradeOption>> waveUpgrades = new HashMap<>();
 
     public UpgradeMenu() {
-
         /* ---------- Stage ---------- */
         stage = new Stage(new ScreenViewport());
 
@@ -36,126 +52,316 @@ public final class UpgradeMenu implements GameEventListener {
         skin = new Skin();
         skin.add("default-font", Fonts.HUD);
 
-        /* — Tek renkli 1×1 doku — */
-        Pixmap pm = new Pixmap(1,1, Pixmap.Format.RGBA8888);
-        pm.setColor(Color.WHITE); pm.fill();
-        Texture white = new Texture(pm); pm.dispose();
+        Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pm.setColor(Color.WHITE);
+        pm.fill();
+        Texture white = new Texture(pm);
+        pm.dispose();
         skin.add("white", white);
 
         Label.LabelStyle lblStyle = new Label.LabelStyle();
-        lblStyle.font  = Fonts.HUD;          // hangi fontu istiyorsanız
+        lblStyle.font = Fonts.HUD;
         lblStyle.fontColor = Color.WHITE;
-        skin.add("default", lblStyle);       // <--
+        skin.add("default", lblStyle);
 
+        Label.LabelStyle errorStyle = new Label.LabelStyle();
+        errorStyle.font = Fonts.HUD;
+        errorStyle.fontColor = Color.RED;
+        skin.add("error", errorStyle);
 
-        /* ---------- Styles ---------- */
         TextButton.TextButtonStyle btn = new TextButton.TextButtonStyle();
         btn.font = Fonts.HUD;
-        btn.up   = skin.newDrawable("white", new Color(0.2f, 0.3f, 0.4f, 0.95f));  // koyu mavi
-        btn.over = skin.newDrawable("white", new Color(0.3f, 0.4f, 0.6f, 1.0f));   // hover rengi
-        btn.down = skin.newDrawable("white", new Color(0.1f, 0.2f, 0.3f, 1.0f));   // basıldığında
+        btn.up = skin.newDrawable("white", new Color(0.2f, 0.3f, 0.4f, 0.95f));
+        btn.over = skin.newDrawable("white", new Color(0.3f, 0.4f, 0.6f, 1.0f));
+        btn.down = skin.newDrawable("white", new Color(0.1f, 0.2f, 0.3f, 1.0f));
         btn.fontColor = Color.WHITE;
         skin.add("upgrade", btn);
 
+        TextButton.TextButtonStyle disabledBtn = new TextButton.TextButtonStyle();
+        disabledBtn.font = Fonts.HUD;
+        disabledBtn.up = skin.newDrawable("white", new Color(0.2f, 0.2f, 0.2f, 0.7f));
+        disabledBtn.fontColor = Color.GRAY;
+        skin.add("upgrade-disabled", disabledBtn);
+
         Window.WindowStyle win = new Window.WindowStyle();
         win.titleFont = Fonts.TITLE;
-        win.background = skin.newDrawable("white", new Color(0f, 0f, 0f, 0.85f));  // yarı saydam siyah
+        win.background = skin.newDrawable("white", new Color(0f, 0f, 0f, 0.85f));
         skin.add("root", win);
 
+        // Initialize wave-specific upgrades
+        setupWaveUpgrades();
         buildUI();
-        EventBus.register(this);
     }
 
-    /* ---------- pencere & butonlar ---------- */
-    private void buildUI(){
+    private void setupWaveUpgrades() {
+        // Wave 1 upgrades
+        waveUpgrades.put(0, Arrays.asList(
+            new UpgradeOption("HEALTH +25", Upgrade.HEALTH, 10, 25f),
+            new UpgradeOption("DAMAGE +20%", Upgrade.DAMAGE, 15, 1.2f),
+            new UpgradeOption("SPEED +15%", Upgrade.SPEED, 12, 1.15f)
+        ));
+
+        // Wave 2 upgrades
+        waveUpgrades.put(1, Arrays.asList(
+            new UpgradeOption("HEALTH +50", Upgrade.HEALTH, 20, 50f),
+            new UpgradeOption("DAMAGE +30%", Upgrade.DAMAGE, 25, 1.3f),
+            new UpgradeOption("SPEED +25%", Upgrade.SPEED, 22, 1.25f)
+        ));
+
+        // Wave 3 upgrades
+        waveUpgrades.put(2, Arrays.asList(
+            new UpgradeOption("HEALTH +75", Upgrade.HEALTH, 30, 75f),
+            new UpgradeOption("DAMAGE +50%", Upgrade.DAMAGE, 35, 1.5f),
+            new UpgradeOption("SPEED +40%", Upgrade.SPEED, 32, 1.4f)
+        ));
+
+        // Wave 4 upgrades (final)
+        waveUpgrades.put(3, Arrays.asList(
+            new UpgradeOption("HEALTH +100", Upgrade.HEALTH, 45, 100f),
+            new UpgradeOption("DAMAGE +75%", Upgrade.DAMAGE, 50, 1.75f),
+            new UpgradeOption("SPEED +60%", Upgrade.SPEED, 48, 1.6f)
+        ));
+    }
+
+    private void buildUI() {
         root = new Window("", skin, "root");
         root.pad(40);
-        root.setModal(true); root.setMovable(false);
+        root.setModal(true);
+        root.setMovable(false);
+        root.setWidth(600); // Fixed width
 
         Label title = new Label("CHOOSE AN UPGRADE", skin);
-        title.setFontScale(1.4f);                        // büyük yazı
+        title.setFontScale(1.4f);
         title.setAlignment(Align.center);
-        root.add(title).padBottom(40).center().row();
-        addButton("1  :  +50 HEALTH", Upgrade.HEALTH);
-        addButton("2  :  +50% DAMAGE", Upgrade.DAMAGE);
-        addButton("3  :  +50% SPEED" , Upgrade.SPEED );
+        root.add(title).padBottom(20).center().row();
+
+        goldLabel = new Label("Gold: 0", skin);
+        goldLabel.setFontScale(1.2f);
+        goldLabel.setAlignment(Align.center);
+        root.add(goldLabel).padBottom(20).center().row();
+
+        upgradeTable = new Table();
+        upgradeTable.top().left();
+
+        ScrollPane.ScrollPaneStyle scrollStyle = new ScrollPane.ScrollPaneStyle();
+        ScrollPane scrollPane = new ScrollPane(upgradeTable, scrollStyle);
+        scrollPane.setFadeScrollBars(false);
+        scrollPane.setScrollingDisabled(true, false); // Only vertical scroll
+
+        root.add(scrollPane).height(240).width(520).padBottom(20).expandX().center().row();
+
+        errorLabel = new Label("", skin, "error");
+        errorLabel.setFontScale(1.1f);
+        errorLabel.setAlignment(Align.center);
+        errorLabel.setVisible(false);
+        root.add(errorLabel).padBottom(10).center().row();
 
         root.pack();
         root.setPosition(
-            (Gdx.graphics.getWidth()  - root.getWidth())  /2f,
-            (Gdx.graphics.getHeight() - root.getHeight()) /2f);
+            (Gdx.graphics.getWidth() - root.getWidth()) / 2f,
+            (Gdx.graphics.getHeight() - root.getHeight()) / 2f
+        );
         stage.addActor(root);
 
-        // Animasyonlu giriş burada olmalı
-        root.setColor(1,1,1,0);
+        root.setColor(1, 1, 1, 0);
         root.setScale(0.9f);
-        root.setVisible(true);
-        root.addAction(Actions.parallel(
-            Actions.fadeIn(.25f),
-            Actions.scaleTo(1f,1f,.25f)
-        ));
-
-        root.setVisible(false); // en son false yapılır
-    }
-
-    private void addButton(String text, Upgrade up){
-        TextButton b = new TextButton(text, skin, "upgrade");
-        b.pad(16,60,16,60);  // daha büyük padding
-        b.getLabel().setFontScale(1.2f);  // yazı boyutu
-        root.add(b).width(500).pad(12).center().row();
-        b.addListener(new ClickListener(){
-            @Override public void clicked(InputEvent e,float x,float y){ apply(up); }
-        });
+        root.setVisible(false);
     }
 
 
-    /* ---------- göster / gizle ---------- */
-    public void show(Player p){
-        if (visible) return;
-        player = p; visible = true;
+    private void refreshUpgradeOptions() {
+        upgradeTable.clear();
+        List<UpgradeOption> options = waveUpgrades.getOrDefault(currentWave, Collections.emptyList());
+        boolean canAfford = false;
 
-        Gdx.input.setInputProcessor(stage);
-        root.setColor(1,1,1,0); root.setVisible(true);
-        root.addAction(Actions.fadeIn(.25f));
-    }
-    private void hide(){
-        if (!visible) return;
-        visible = false;
-        root.addAction(Actions.sequence(
-            Actions.fadeOut(.2f), Actions.visible(false)));
-        Gdx.input.setInputProcessor(null);
-    }
-    public boolean isVisible(){ return visible; }
+        for (int i = 0; i < options.size(); i++) {
+            final UpgradeOption option = options.get(i);
+            String buttonText = (i + 1) + "  :  " + option.name + " (Cost: " + option.cost + " Gold)";
+            TextButton b = new TextButton(buttonText, skin, "upgrade");
+            b.pad(16, 0, 16, 0);
+            b.getLabel().setFontScale(1.1f);
 
-    /* ---------- kısayol tuşları ---------- */
-    public void handleInput(){
-        if (!visible) return;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) apply(Upgrade.HEALTH);
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) apply(Upgrade.DAMAGE);
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) apply(Upgrade.SPEED );
-    }
-
-    /* ---------- uygulama & Event göndermek ---------- */
-    private enum Upgrade{HEALTH,DAMAGE,SPEED}
-    private void apply(Upgrade u){
-        switch(u){
-            case HEALTH: player.increaseHealth(50f);        break;
-            case DAMAGE: player.increaseAttackDamage(1.5f); break;
-            case SPEED : player.increaseMoveSpeed(1.5f);    break;
+            if (player.getGold() < option.cost) {
+                b.setDisabled(true);
+                b.setStyle(skin.get("upgrade-disabled", TextButton.TextButtonStyle.class));
+            } else {
+                canAfford = true;
+                b.setDisabled(false);
+                b.setStyle(skin.get("upgrade", TextButton.TextButtonStyle.class));
+                b.addListener(new ClickListener() {
+                    @Override
+                    public void clicked(InputEvent event, float x, float y) {
+                        applyUpgrade(option);
+                    }
+                });
+            }
+            upgradeTable.add(b).expandX().fillX().height(56).pad(6).center().row();
         }
-        EventBus.post(new GameEvent(GameEventType.UPGRADE_SELECTED, u.name()));
+
+// If player can't afford any upgrade, show skip button
+        if (!canAfford) {
+            TextButton skipBtn = new TextButton("Skip", skin, "upgrade");
+            skipBtn.pad(16, 0, 16, 0);
+            skipBtn.getLabel().setFontScale(1.1f);
+            skipBtn.addListener(new ClickListener() {
+                @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    Gdx.app.log("UpgradeMenu", "Skip button clicked");
+                    EventBus.post(new GameEvent(GameEventType.UPGRADE_SELECTED, "SKIP"));
+                    hide();
+                }
+            });
+            upgradeTable.add(skipBtn).expandX().fillX().height(56).pad(6).center().row();
+        }
+        upgradeTable.pack();
+        upgradeTable.validate();
+    }
+
+    public void show(Player p, int wave) {
+        Gdx.app.log("UpgradeMenu", "Show called for wave: " + wave);
+        if (visible && root.isVisible()) return; // Only block if both are true
+        player = p;
+        currentWave = wave;
+        visible = true;
+
+        inputDelayTimer = 0.3f;
+        blockKeyboard = true;
+        errorLabel.setVisible(false);
+
+        goldLabel.setText("Gold: " + player.getGold());
+        refreshUpgradeOptions();
+
+        previousInputProcessor = Gdx.input.getInputProcessor();
+        Gdx.input.setInputProcessor(stage);
+
+        root.setVisible(true);
+        root.setColor(1, 1, 1, 1);
+        root.setPosition(
+            (Gdx.graphics.getWidth() - root.getWidth()) / 2f,
+            (Gdx.graphics.getHeight() - root.getHeight()) / 2f
+        );
+        root.setScale(1.0f);
+
+        root.getColor().a = 0;
+        root.addAction(Actions.fadeIn(0.3f));
+    }
+
+    public void hide() {
+        Gdx.app.log("UpgradeMenu", "Hide called (visible=" + visible + ")");
+        if (!visible) return;
+        root.addAction(Actions.sequence(
+            Actions.fadeOut(.2f),
+            Actions.visible(false),
+            Actions.run(() -> {
+                visible = false; // Set here, after fade-out
+                if (previousInputProcessor != null) {
+                    Gdx.input.setInputProcessor(previousInputProcessor);
+                }
+            })
+        ));
+    }
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void handleInput() {
+        if (!visible) return;
+        if (blockKeyboard) {
+            inputDelayTimer -= Gdx.graphics.getDeltaTime();
+            if (inputDelayTimer <= 0f) blockKeyboard = false;
+            else return;
+        }
+
+        // Handle error message timer
+        if (errorLabel.isVisible()) {
+            errorMessageTimer -= Gdx.graphics.getDeltaTime();
+            if (errorMessageTimer <= 0f) {
+                errorLabel.setVisible(false);
+            }
+        }
+
+        // Handle number key inputs
+        List<UpgradeOption> options = waveUpgrades.getOrDefault(currentWave, Collections.emptyList());
+        for (int i = 0; i < options.size(); i++) {
+            if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1 + i)) {
+                UpgradeOption option = options.get(i);
+                if (player.getGold() >= option.cost) {
+                    applyUpgrade(option);
+                } else {
+                    showErrorMessage("Not enough gold for this upgrade!");
+                }
+                break;
+            }
+        }
+    }
+
+    private void showErrorMessage(String message) {
+        errorLabel.setText(message);
+        errorLabel.setVisible(true);
+        errorMessageTimer = 2.0f; // Show for 2 seconds
+    }
+
+    private enum Upgrade {HEALTH, DAMAGE, SPEED}
+
+    private static class UpgradeOption {
+        String name;
+        Upgrade type;
+        int cost;
+        float value;
+
+        UpgradeOption(String name, Upgrade type, int cost, float value) {
+            this.name = name;
+            this.type = type;
+            this.cost = cost;
+            this.value = value;
+        }
+    }
+
+    private void applyUpgrade(UpgradeOption option) {
+        Gdx.app.log("UpgradeMenu", "applyUpgrade called: " + option.name);
+
+        // Check if player has enough gold
+        if (player.getGold() < option.cost) {
+            showErrorMessage("Not enough gold for this upgrade!");
+            return;
+        }
+
+        // Apply the upgrade
+        switch (option.type) {
+            case HEALTH:
+                player.increaseHealth(option.value);
+                break;
+            case DAMAGE:
+                player.increaseAttackDamage(option.value);
+                break;
+            case SPEED:
+                player.increaseMoveSpeed(option.value);
+                break;
+        }
+
+        // Deduct the cost
+        player.addGold(-option.cost);
+
+        // Notify the system that an upgrade was selected
+        EventBus.post(new GameEvent(GameEventType.UPGRADE_SELECTED, option.type.name()));
+
+        Gdx.app.log("UpgradeMenu", "Posted UPGRADE_SELECTED for: " + option.type.name());
         hide();
     }
 
-    /* ---------- çizim ---------- */
     public void render(SpriteBatch sb) {
         if (!visible) return;
         stage.act(Gdx.graphics.getDeltaTime());
         stage.draw();
     }
 
-    /* ---------- temizle ---------- */
-    public void dispose(){ stage.dispose(); skin.dispose(); }
+    public void dispose() {
+        stage.dispose();
+        skin.dispose();
+    }
 
-    @Override public void onEvent(GameEvent e){ /* gerekirse kullan */ }
+    public Stage getStage() {
+        return stage;
+    }
 }

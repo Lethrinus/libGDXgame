@@ -15,6 +15,8 @@ public final class Fonts {
     public static BitmapFont TITLE;          // 48 px (menü başlığı)
     public static BitmapFont BIG;           // 140 px (3-2-1-GO)
     public static BitmapFont NPC_FONT;
+    public static BitmapFont HUD_COMPACT;
+
 
     /** create() içinde bir kez çağır. */
     public static void load() {
@@ -45,14 +47,20 @@ public final class Fonts {
         prm.color = Color.WHITE;
         BIG = gen.generateFont(prm);
 
+        // HUD_COMPACT (less spacing)
+        prm.size = 48;
+        prm.characters = FreeTypeFontGenerator.DEFAULT_CHARS;
+        prm.spaceX = -2; // Reduce horizontal spacing between letters
+        HUD_COMPACT = gen.generateFont(prm);
+
         gen.dispose();
     }
 
-    /** CoreGame.dispose() içinde çağır. */
     public static void dispose() {
         HUD.dispose();
         TITLE.dispose();
         BIG.dispose();
         NPC_FONT.dispose();
+        HUD_COMPACT.dispose();
     }
 }

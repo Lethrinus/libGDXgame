@@ -3,12 +3,13 @@ package io.github.ballsofsteel.ui;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
+import io.github.ballsofsteel.ui.Fonts;
 
-public final class GoldCounterUI {
+public final class WaveCounterUI {
 
-    private static final float ICON_PX = 128f;
-    private static final float PAD_PX  = 10f;
-    private static final float GAP_PX  = 4f;
+    private static final float ICON_PX = 96f;
+    private static final float PAD_PX  = 25f;
+    private static final float GAP_PX  = 10f;
 
     private final OrthographicCamera cam;
     private final SpriteBatch        batch;
@@ -16,37 +17,36 @@ public final class GoldCounterUI {
     private final BitmapFont         font = Fonts.HUD;
     private final GlyphLayout        layout = new GlyphLayout();
 
-    private int gold = 0;
+    private int wave = 0;
 
-    public GoldCounterUI(OrthographicCamera hudCamera) {
+    public WaveCounterUI(OrthographicCamera hudCamera) {
         this.cam   = hudCamera;
         this.batch = new SpriteBatch();
-        this.icon  = new Texture("HUD/gold_bag.png");
+        this.icon  = new Texture("HUD/wave_icon.png");  // ikon dosyasını sen belirle (128x128 önerilir)
     }
 
-    public void setGold(int v){ gold = v; }
-
+    public void setWave(int wave) {
+        this.wave = Math.max(1, wave + 1); // Always show at least 1
+    }
     public void draw() {
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
 
-        float xI = cam.viewportWidth  - PAD_PX - ICON_PX;
+        float xI = PAD_PX;
         float yI = cam.viewportHeight - PAD_PX - ICON_PX;
 
-        String txt = String.valueOf(gold);
+        String txt = "Wave " + (wave + 1);
         layout.setText(font, txt);
 
-        float xT = xI - GAP_PX - layout.width;
-        float yT = yI + ICON_PX/2f + layout.height/4f;
-
+        float xT = xI + ICON_PX + GAP_PX;
+        float yT = yI + ICON_PX / 2f + layout.height / 4f;
         batch.draw(icon, xI, yI, ICON_PX, ICON_PX);
         font.draw(batch, layout, xT, yT);
 
         batch.end();
     }
-
-    public void dispose(){
+    public void dispose() {
         batch.dispose();
-        icon .dispose();   // HUD & BIG font’lar Fonts.dispose() içinde yok edilecek
+        icon.dispose();
     }
 }

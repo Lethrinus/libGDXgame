@@ -183,7 +183,7 @@ public class Goblin extends BaseEnemy {
         super.takeDamage(dmg,kb,angDeg);
         if(hp<=0f){
             st=ST.DIE; deathT=0f;
-            if(MathUtils.randomBoolean(0.4f))
+            if(MathUtils.randomBoolean(1f))
                 loot.add(new GoldBag(
                     x+MathUtils.random(-GOLD_SPREAD,GOLD_SPREAD),
                     y+MathUtils.random(-GOLD_SPREAD,GOLD_SPREAD)));

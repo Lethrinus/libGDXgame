@@ -37,5 +37,6 @@ public interface EntityFactory {
                                     float x, float y);
 
     /* -------- NPC -------- */
-    NPC createNPC(CoreGame game,float x,float y,String[] lines);
+    NPC createNPC(CoreGame game, float x, float y);
+
 }

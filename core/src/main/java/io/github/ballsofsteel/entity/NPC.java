@@ -11,11 +11,16 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
 import io.github.ballsofsteel.core.CoreGame;
+import io.github.ballsofsteel.core.WaveManager;
 import io.github.ballsofsteel.events.EventBus;
 import io.github.ballsofsteel.events.GameEvent;
+import io.github.ballsofsteel.events.GameEventListener;
 import io.github.ballsofsteel.events.GameEventType;
 
-public class NPC {
+import java.util.HashMap;
+import java.util.Map;
+
+public class NPC implements GameEventListener {
 
     private float x, y;
     private float interactionRadius = 2.0f;
@@ -24,11 +29,11 @@ public class NPC {
     private Texture pointerTexture;
     private BitmapFont font;
 
-    private String[] dialogues;
+    private final Map<Integer, String[]> waveDialogues = new HashMap<>();
+    private String[] currentDialogue;
     private int currentLineIndex = 0;
     private boolean inDialogue = false;
     private boolean showPointer = true;
-
     private boolean finishedDialogue = false;
 
     private float typedSpeed = 20f;
@@ -50,11 +55,12 @@ public class NPC {
 
     private CoreGame game;
 
-    public NPC(CoreGame game, float x, float y, String[] dialogues) {
+    public NPC(CoreGame game, float x, float y) {
         this.game = game;
         this.x = x;
         this.y = y;
-        this.dialogues = dialogues;
+        this.currentDialogue = new String[]{};
+        EventBus.register(this);
 
         pawnTexture = new Texture(Gdx.files.internal("Pawn/pawn_animations.png"));
         TextureRegion idleRegion = new TextureRegion(pawnTexture, 2, 2, 1152, 186);
@@ -84,40 +90,43 @@ public class NPC {
         lastDistance = dist;
 
         if (dist <= interactionRadius && Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-
-            // Interval aktifse upgrade menüsünü göster
-            if (firstWaveStarted && isIntervalActive()) {
-                EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
-                return;
-            }
-
-            // İlk diyalog tamamlandıysa ve interval değilse tekrar konuşamaz
-            if (finishedDialogue && !isIntervalActive()) {
-                return;
-            }
+            if (!isNpcInteractable()) return;
 
             if (!inDialogue) {
                 inDialogue = true;
                 currentLineIndex = 0;
-                startTypingEffect(dialogues[0]);
+                updateCurrentDialogue();
+                startTypingEffect(currentDialogue[0]);
             } else {
                 if (!typedComplete) {
-                    typedIndex = dialogues[currentLineIndex].length();
+                    typedIndex = currentDialogue[currentLineIndex].length();
                     typedComplete = true;
                 } else {
                     currentLineIndex++;
-                    if (currentLineIndex >= dialogues.length) {
+                    if (currentLineIndex < currentDialogue.length) {
+                        startTypingEffect(currentDialogue[currentLineIndex]);
+                    } else {
                         inDialogue = false;
                         finishedDialogue = true;
 
-                        if (!firstWaveStarted) {
-                            firstWaveStarted = true;
+                        int wave = game.getWaveManager() != null ? game.getWaveManager().getCurrentWave() : -1;
+                        boolean isStillInterval = game != null && game.isIntervalActive();
+
+                        if (wave == -1 || wave == 0) {
+                            // First wave: start wave directly, no upgrade menu
                             EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
-                        } else {
-                            EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, null));
+                        } else if (isStillInterval && wave >= 1 && wave < 4) {
+                            // Show upgrade menu after dialogue, except last wave
+                            if (game != null && game.getUpgradeMenu() != null && !game.getUpgradeMenu().isVisible()) {
+                                EventBus.post(new GameEvent(GameEventType.UPGRADE_MENU_REQUEST, wave));
+                            }
+                        } else if (wave == 4) {
+                            // Last wave: after dialogue, start last wave (no upgrade menu)
+                            EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
+                        } else if (wave == 5) {
+                            // Game completed
+                            EventBus.post(new GameEvent(GameEventType.GAME_COMPLETED, null));
                         }
-                    } else {
-                        startTypingEffect(dialogues[currentLineIndex]);
                     }
                 }
             }
@@ -126,10 +135,18 @@ public class NPC {
         if (inDialogue && !typedComplete) {
             typedTimer += delta;
             int show = (int)(typedTimer * typedSpeed);
-            int total = dialogues[currentLineIndex].length();
+            int total = currentDialogue[currentLineIndex].length();
             if (show >= total) { show = total; typedComplete = true; }
             typedIndex = show;
-            typedText = dialogues[currentLineIndex];
+            typedText = currentDialogue[currentLineIndex];
+        }
+    }
+
+    private void updateCurrentDialogue() {
+        int wave = game != null && game.getWaveManager() != null ? game.getWaveManager().getCurrentWave() : -1;
+        currentDialogue = waveDialogues.getOrDefault(wave, waveDialogues.get(-1));
+        if (currentDialogue == null || currentDialogue.length == 0) {
+            currentDialogue = new String[]{"..."};
         }
     }
 
@@ -191,7 +208,6 @@ public class NPC {
         float wrapWidth = bubblePixelWidth - marginPixels;
 
         String visibleText = typedText.substring(0, Math.min(typedIndex, typedText.length()));
-
         GlyphLayout layout = new GlyphLayout();
         layout.setText(font, visibleText, Color.BLACK, wrapWidth, Align.left, true);
 
@@ -215,12 +231,30 @@ public class NPC {
 
     public float getX() { return x; }
     public float getY() { return y; }
-
     public void setPointerVisible(boolean visible) { this.showPointer = visible; }
     public boolean isPointerVisible() { return showPointer; }
+    private WaveManager getWaveManager() {
+        return game != null ? game.getWaveManager() : null;
+    }
+    public void setDialoguesForWave(int wave, String[] lines) {
+        waveDialogues.put(wave, lines);
+    }
 
-    /** Dummy – gerçek interval durumunu WaveManager'dan almalısın */
-    private boolean isIntervalActive() {
-        return game != null && game.isIntervalActive();
+    public boolean isNpcInteractable() {
+        WaveManager waveManager = getWaveManager();
+        return waveManager != null && waveManager.isNpcInteractable();
+    }
+    @Override
+    public void onEvent(GameEvent event) {
+        switch (event.getType()) {
+            case UPGRADE_SELECTED:
+            case WAVE_START_REQUEST:
+                finishedDialogue = false;
+                break;
+            default:
+                break;
+        }
     }
 }
+
+

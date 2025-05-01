@@ -58,7 +58,7 @@ public class GameEntityFactory implements EntityFactory {
         return new BarrelBomber(player, game, crowd, x, y);
     }
 
-    @Override public NPC createNPC(CoreGame game, float x,float y,String[] lines){
-        return new NPC(game,x,y,lines);
+    public NPC createNPC(CoreGame game, float x, float y) {
+        return new NPC(game, x, y);
     }
 }

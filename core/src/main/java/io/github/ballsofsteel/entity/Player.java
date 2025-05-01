@@ -279,7 +279,7 @@ public class Player {
         return tileMapRenderer.isCellBush(tileX, tileY);
     }
 
-    private int gold;
+    private int gold = 200;
     public void addGold(int n){ gold += n; }
     public int  getGold(){ return gold; }
 

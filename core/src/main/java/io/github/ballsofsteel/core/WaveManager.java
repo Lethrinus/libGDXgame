@@ -13,7 +13,7 @@ import java.util.*;
 public final class WaveManager implements GameEventListener {
 
     /* ---------- durum ---------- */
-    private enum State { PRE_WAVE, IN_WAVE, INTERVAL, COMPLETED }
+    public enum State { PRE_WAVE, IN_WAVE, INTERVAL, COMPLETED }
     private State state = State.PRE_WAVE;
 
     private static boolean intervalActive = false;
@@ -26,10 +26,12 @@ public final class WaveManager implements GameEventListener {
     }
 
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 24,0, 0),
-        new WaveSpec(0, 1, 0),
-        new WaveSpec(0, 0, 1),
-        new WaveSpec(18,10, 6)
+        new WaveSpec( 0,0, 0),
+        new WaveSpec(0, 0, 0),
+        new WaveSpec(0, 0, 0),
+        new WaveSpec(1,0, 0),
+         new WaveSpec(0,0, 0),
+        new WaveSpec(0,0, 0)
     );
 
     /* ---------- referans / sayaç ---------- */
@@ -56,10 +58,11 @@ public final class WaveManager implements GameEventListener {
     private float countTimer = 0f;
     private boolean counting = false;
 
+     private boolean upgradeMenuRequested = false;
+
     public WaveManager(CoreGame g, GameEntityFactory f){
         game = g; factory = f;
         EventBus.register(this);
-
         spawnManager.addSpawnPoint(44, 25);
 
     }
@@ -67,109 +70,114 @@ public final class WaveManager implements GameEventListener {
 
     /* ======================== update ======================== */
     public void update(float dt) {
-
-        /* 1) geri sayım */
-        if (counting){
-            countTimer += dt;
-            if (countTimer >= COUNTDOWN_GAP){
-                countTimer = 0f;
-                countNum--;
-                EventBus.post(new GameEvent(GameEventType.WAVE_COUNTDOWN, countNum));
-                if (countNum < 0) counting = false;  // GO!
-            }
-        }
-
-        /* 2) dalga durumu */
-        switch (state){
-
+        switch (state) {
+            case PRE_WAVE:
+                handlePreWave(dt);
+                break;
             case IN_WAVE:
                 handleInWave(dt);
                 break;
-
             case INTERVAL:
                 handleInterval(dt);
                 break;
-
-            default:
+            case COMPLETED:
+                // No-op
                 break;
+        }
+        // Handle countdown for all states if needed
+        if (counting) {
+            countTimer += dt;
+            if (countTimer >= COUNTDOWN_GAP) {
+                countTimer = 0f;
+                countNum--;
+                EventBus.post(new GameEvent(GameEventType.WAVE_COUNTDOWN, countNum));
+                if (countNum < 0) counting = false;
+            }
         }
     }
 
-    /* =========== IN_WAVE =========== */
-    private void handleInWave(float dt){
+    /* ========== PRE_WAVE ========== */
+    private void handlePreWave(float dt) {
+        // Wait for WAVE_START_REQUEST event to transition to IN_WAVE
+        // No automatic transition here
+    }
 
-        if (counting) return;      // Sayım bitene kadar spawn yok.
+    /* =========== IN_WAVE =========== */
+    private void handleInWave(float dt) {
+        if (counting) return;
 
         spawnTimer -= dt;
-        int alive = game.getGoblins().size()
-            + game.getDynaList().size()
-            + game.getBarrels().size();
+        int alive = game.getGoblins().size() + game.getDynaList().size() + game.getBarrels().size();
 
         if (spawnTimer <= 0f && !queue.isEmpty() && alive < MAX_ALIVE) {
-            queue.pollFirst().run();
+            Runnable spawn = queue.poll();
+            if (spawn != null) spawn.run();
             spawnTimer = SPAWN_GAP;
         }
 
-        /* Dalga bitti mi? */
-        if (queue.isEmpty()
-            && game.getGoblins().isEmpty()
-            && game.getDynaList().isEmpty()
-            && game.getBarrels().isEmpty()) {
-
-            if (currentWave >= waves.size()-1){
+        // Only check for completion when everything is done
+        if (queue.isEmpty() && alive == 0) {
+            // Wave finished, go to INTERVAL or COMPLETED
+            if (currentWave + 1 >= waves.size()) {
                 state = State.COMPLETED;
                 intervalActive = false;
-                EventBus.post(new GameEvent(GameEventType.GAME_COMPLETED,null));
+                EventBus.post(new GameEvent(GameEventType.GAME_COMPLETED, null));
             } else {
                 state = State.INTERVAL;
                 intervalActive = true;
-                intervalTimer  = INTERVAL_LEN;
+                intervalTimer = 0f;
+                upgradeMenuRequested = false;
                 game.getNpc().setPointerVisible(true);
             }
         }
     }
 
     /* ========== INTERVAL ========== */
-    private void handleInterval(float dt){
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE))
-            intervalTimer = 0f;
-        intervalTimer -= dt;
-        if (intervalTimer <= 0f) startNextWave();
+    private void handleInterval(float dt) {
+        intervalTimer += dt;
+        // Wait for NPC dialogue and upgrade menu to finish, then WAVE_START_REQUEST event will trigger next wave
+        // No automatic transition here
     }
+
 
     /* ========== EventBus ========== */
     @Override
-    public void onEvent(GameEvent e){
-        if (e.getType()==GameEventType.WAVE_START_REQUEST && state==State.PRE_WAVE)
-            startNextWave();
+    public void onEvent(GameEvent e) {
+        if (e.getType() == GameEventType.WAVE_START_REQUEST) {
+            if (state == State.PRE_WAVE || state == State.INTERVAL) {
+                startNextWave();
+            }
+        }
     }
 
     /* ========== yeni dalga ========== */
-    public void startNextWave(){
-
+    public void startNextWave() {
         currentWave++;
-        if (currentWave >= waves.size()) return;
+        if (currentWave >= waves.size()) {
+            state = State.COMPLETED;
+            intervalActive = false;
+            return;
+        }
 
         WaveSpec s = waves.get(currentWave);
         queue.clear();
-        enqueue(s.gob   , this::spawnGoblin);
-        enqueue(s.dyn   , this::spawnDyna);
+        enqueue(s.gob, this::spawnGoblin);
+        enqueue(s.dyn, this::spawnDyna);
         enqueue(s.barrel, this::spawnBarrel);
 
-        counting   = true;     // 3-2-1-GO
-        countNum   = 3;
+        counting = true;
+        countNum = 3;
         countTimer = 0f;
-        EventBus.post(new GameEvent(GameEventType.WAVE_COUNTDOWN,3));
+        EventBus.post(new GameEvent(GameEventType.WAVE_COUNTDOWN, 3));
 
-        state          = State.IN_WAVE;
+        state = State.IN_WAVE;
         intervalActive = false;
-        spawnTimer     = SPAWN_GAP;  //
+        spawnTimer = SPAWN_GAP;
 
         game.getNpc().setPointerVisible(false);
     }
 
-    private void enqueue(int n, Runnable r){ for(int i=0;i<n;i++) queue.add(r); }
-
+    private void enqueue(int n, Runnable r) { for (int i = 0; i < n; i++) queue.add(r); }
     /* ----- spawn helpers ----- */
     private void spawnGoblin(){
         Vector2 spawn = spawnManager.getRandomSpawnPoint();
@@ -188,6 +196,13 @@ public final class WaveManager implements GameEventListener {
         game.getBarrels().add(factory.createBarrelBomber(
             game.getPlayer(), game, game.getBarrels(), spawn.x, spawn.y));
     }
+    public int getCurrentWave() {
+        return currentWave;
+    }
+    public boolean isNpcInteractable() {
+        return state == State.PRE_WAVE || state == State.INTERVAL;
+    }
+
 
 }
 
