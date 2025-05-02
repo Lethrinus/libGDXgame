@@ -1,4 +1,3 @@
-// src/io/github/some_example_name/events/EventBus.java
 package io.github.ballsofsteel.events;
 import java.util.concurrent.CopyOnWriteArrayList;
 public final class EventBus {

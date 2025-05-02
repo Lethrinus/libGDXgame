@@ -52,7 +52,6 @@ public class ShaderManager {
             "    gl_FragColor = darkened;\n" +
             "}";
 
-    // Grayscale shader source (fixed to include u_grayscaleFactor)
     private static final String GRAYSCALE_VERT = VERT;
 
     private static final String GRAYSCALE_FRAG =

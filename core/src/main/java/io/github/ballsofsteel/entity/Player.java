@@ -12,20 +12,18 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
+import io.github.ballsofsteel.events.EventBus;
 import io.github.ballsofsteel.ui.Inventory;
 import io.github.ballsofsteel.core.TileMapRenderer;
 import io.github.ballsofsteel.core.CoreGame;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Player class with movement, attacking, dash mechanics, and collision detection.
- */
+
 public class Player {
     private float x, y;
     private float speed = 3.5f;
     private CoreGame core;
-    // Timers for movement and attack animations.
     private float movementStateTime = 0f;
     private float attackStateTime = 0f;
 
@@ -114,8 +112,6 @@ public class Player {
     private Vector2 knockback = new Vector2(0, 0);
     private float knockbackDecay = 5f;
 
-    // Attack-related fields.
-    private Goblin targetGoblin;
     private boolean attackExecuted = false;
     private float attackHitTime = 0.15f;
     private float attackDuration = 0.4f;
@@ -126,13 +122,6 @@ public class Player {
     public float getY() { return y; }
     public float getHealth() { return health; }
     public float getMaxHealth() { return maxHealth; }
-    public float getDashCooldown() {
-        return dashCooldown;
-    }
-    public float getDashCooldownTimer() {
-        return dashCooldownTimer;
-    }
-
     private Inventory inventory;
 
     public Player(OrthographicCamera camera, TileMapRenderer tileMapRenderer, CoreGame core) {
@@ -204,9 +193,7 @@ public class Player {
         y = 4.5f;
     }
 
-    /**
-     * Triggers the healing effect animation.
-     */
+
     public void triggerHealEffect() {
         isHealing = true;
         healStateTime = 0f;
@@ -247,57 +234,24 @@ public class Player {
         return inventory;
     }
 
-    /**
-     * Sets the player's position.
-     *
-     * @param x New x-coordinate.
-     * @param y New y-coordinate.
-     */
+
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
     }
 
-    /**
-     * Sets the target goblin for attack interactions.
-     *
-     * @param goblin The target Goblin.
-     */
-    public void setTargetGoblin(Goblin goblin) {
-        this.targetGoblin = goblin;
-    }
 
-    /**
-     * Updates the TileMapRenderer reference (used when changing maps).
-     *
-     * @param tileMapRenderer The new TileMapRenderer.
-     */
-    public void setTileMapRenderer(TileMapRenderer tileMapRenderer) {
-        this.tileMapRenderer = tileMapRenderer;
-    }
-
-    /**
-     * Checks if the player is currently in a bush cell.
-     *
-     * @return true if in a bush cell; false otherwise.
-     */
     public boolean isInBush() {
         int tileX = (int) Math.floor(x);
         int tileY = (int) Math.floor(y);
         return tileMapRenderer.isCellBush(tileX, tileY);
     }
 
-    private int gold = 200;
+    private int gold = 17;
     public void addGold(int n){ gold += n; }
     public int  getGold(){ return gold; }
 
-    /**
-     * Applies damage, knockback, and red flash effect to the player.
-     *
-     * @param damage         Damage amount.
-     * @param knockbackForce Force of the knockback.
-     * @param angleDegrees   Direction of the knockback in degrees.
-     */
+
     public void takeDamage(float damage, float knockbackForce, float angleDegrees) {
         health -= damage;
         if (health < 0) health = 0;
@@ -305,8 +259,7 @@ public class Player {
         knockback.set(knockbackForce * MathUtils.cos(angleRad) * 1.5f,
             knockbackForce * MathUtils.sin(angleRad) * 1.5f);
         redFlashTimer = redFlashDuration;
-        io.github.ballsofsteel.events.EventBus.get()
-            .post(new io.github.ballsofsteel.events.GameEvent(
+        EventBus.post(new io.github.ballsofsteel.events.GameEvent(
                 io.github.ballsofsteel.events.GameEventType.PLAYER_HEALTH_CHANGED, this));
     }
     public float getSpriteHeight() {

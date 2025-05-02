@@ -3,14 +3,10 @@ package io.github.ballsofsteel.entity;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
-import com.badlogic.gdx.math.MathUtils;
 
-/** Altın kesesi – yere düştüğünde 7 karelik bir spawn animasyonu oynatır. */
 public class GoldBag {
 
-    /* -------------------------------------------------- */
-    /*  Atlas & animasyon                                 */
-    /* -------------------------------------------------- */
+   // atlas && animation
     private static final Texture SPAWN_TEX =
         new Texture(Gdx.files.internal("goldbag_spawn.png"));   // 896×128
     private static final Texture ICON_TEX  =
@@ -25,28 +21,22 @@ public class GoldBag {
         SPAWN_TEX.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         TextureRegion src = new TextureRegion(SPAWN_TEX, 2, 2, 896, 128);   // bounds
         TextureRegion[] frames = src.split(896 / 7, 128)[0];                // 7 kare
-        SPAWN_ANIM = new Animation<TextureRegion>(0.15f, frames);
+        SPAWN_ANIM = new Animation<>(0.15f, frames);
         SPAWN_ANIM.setPlayMode(Animation.PlayMode.NORMAL);
     }
 
     /* -------------------------------------------------- */
     private final float x, y;
-    private float t = 0f;                     // animasyon süresi
+    private float t = 0f;                     // animation time
 
     public GoldBag(float x, float y){ this.x = x; this.y = y; }
 
-    /* -------------------------------------------------- */
-    /** Oyuncu (px,py) konumundaysa true döner (toplandı). */
-    public boolean checkCollected(float px, float py){
-        float dx = px - x, dy = py - y;
-        return dx*dx + dy*dy <= R*R;
-    }
     public boolean isCollectedBy(Player p){
         float dx = p.getX()-x, dy = p.getY()-y;
         return dx*dx+dy*dy < R*R;
     }
 
-    /* -------------------------------------------------- */
+    // render
     public void render(SpriteBatch b){
 
         t += Gdx.graphics.getDeltaTime();

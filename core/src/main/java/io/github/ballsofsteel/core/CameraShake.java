@@ -25,7 +25,7 @@ public class CameraShake {
         if (timeLeft > 0f) {
             timeLeft -= delta;
 
-            float currentPower = power * (timeLeft / duration); // azalmalı
+            float currentPower = power * (timeLeft / duration);
             float offsetX = (MathUtils.random() - 0.5f) * 2f * currentPower;
             float offsetY = (MathUtils.random() - 0.5f) * 2f * currentPower;
 

@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+Main-Class: io.github.some_example_name.lwjgl3.Lwjgl3Launcher
+

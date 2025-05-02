@@ -1,10 +1,6 @@
 package io.github.ballsofsteel.core;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
-import io.github.ballsofsteel.entity.*;
 import io.github.ballsofsteel.events.*;
 import io.github.ballsofsteel.factory.GameEntityFactory;
 
@@ -12,53 +8,53 @@ import java.util.*;
 
 public final class WaveManager implements GameEventListener {
 
-    /* ---------- durum ---------- */
+    //states
     public enum State { PRE_WAVE, IN_WAVE, INTERVAL, COMPLETED }
     private State state = State.PRE_WAVE;
 
     private static boolean intervalActive = false;
-    public  static boolean isIntervalActive() { return intervalActive; }
+
     private final SpawnManager spawnManager = new SpawnManager();
-    /* ---------- dalga şablonu ---------- */
+
+    public int getCurrentWave() { return currentWave;}
+    public boolean isNpcInteractable() {return state == State.PRE_WAVE || state == State.INTERVAL;}
+    public  static boolean isIntervalActive() { return intervalActive; }
+
+    // wave  blueprint
     private static final class WaveSpec {
         final int gob, dyn, barrel;
         WaveSpec(int g,int d,int b){ gob=g; dyn=d; barrel=b; }
     }
 
     private final List<WaveSpec> waves = Arrays.asList(
-        new WaveSpec( 4,0, 0),
-        new WaveSpec(4, 0, 0),
-        new WaveSpec(4, 0, 0),
-        new WaveSpec(4,0, 0),
-         new WaveSpec(4,0, 0),
-        new WaveSpec(4,0, 0)
+        new WaveSpec( 1, 0, 0), // wave -1: pre-start
+        new WaveSpec(1, 0, 0), // wave 0
+        new WaveSpec(1, 0, 0), // wave 1
+        new WaveSpec(1, 0, 0), // wave 2
+        new WaveSpec(1, 0, 0), // wave 3
+        new WaveSpec(1, 0, 0), // wave 4
+        new WaveSpec(1,  0, 0)  // wave 5: game complete
     );
 
-    /* ---------- referans / sayaç ---------- */
+    // references and counters
     private final CoreGame           game;
     private final GameEntityFactory  factory;
-    private final Random rng = new Random();
-
 
 
     private static final int   MAX_ALIVE    = 12;
-    private static final float INTERVAL_LEN = 30f;
     private static final float SPAWN_GAP    = 1.3f;
     private static final float COUNTDOWN_GAP= 1f;
 
 
     private int   currentWave  = -1;
-    private float intervalTimer= 0f;
     private float spawnTimer   = 0f;
 
     private final Deque<Runnable> queue = new ArrayDeque<>();
 
-    /* ----- geri sayım ----- */
+    // countdown
     private int   countNum   = 0;     // 3-2-1-0
     private float countTimer = 0f;
     private boolean counting = false;
-
-     private boolean upgradeMenuRequested = false;
 
     public WaveManager(CoreGame g, GameEntityFactory f){
         game = g; factory = f;
@@ -68,7 +64,7 @@ public final class WaveManager implements GameEventListener {
     }
 
 
-    /* ======================== update ======================== */
+    // update //
     public void update(float dt) {
         switch (state) {
             case PRE_WAVE:
@@ -78,7 +74,6 @@ public final class WaveManager implements GameEventListener {
                 handleInWave(dt);
                 break;
             case INTERVAL:
-                handleInterval(dt);
                 break;
             case COMPLETED:
                 // No-op
@@ -96,13 +91,12 @@ public final class WaveManager implements GameEventListener {
         }
     }
 
-    /* ========== PRE_WAVE ========== */
+    // pre - wave
     private void handlePreWave(float dt) {
-        // Wait for WAVE_START_REQUEST event to transition to IN_WAVE
-        // No automatic transition here
+
     }
 
-    /* =========== IN_WAVE =========== */
+    // in - wave
     private void handleInWave(float dt) {
         if (counting) return;
 
@@ -115,9 +109,8 @@ public final class WaveManager implements GameEventListener {
             spawnTimer = SPAWN_GAP;
         }
 
-        // Only check for completion when everything is done
+        // check if all enemies are dead or game complete
         if (queue.isEmpty() && alive == 0) {
-            // Wave finished, go to INTERVAL or COMPLETED
             if (currentWave + 1 >= waves.size()) {
                 state = State.COMPLETED;
                 intervalActive = false;
@@ -125,22 +118,13 @@ public final class WaveManager implements GameEventListener {
             } else {
                 state = State.INTERVAL;
                 intervalActive = true;
-                intervalTimer = 0f;
-                upgradeMenuRequested = false;
                 game.getNpc().setPointerVisible(true);
             }
         }
     }
 
-    /* ========== INTERVAL ========== */
-    private void handleInterval(float dt) {
-        intervalTimer += dt;
-        // Wait for NPC dialogue and upgrade menu to finish, then WAVE_START_REQUEST event will trigger next wave
-        // No automatic transition here
-    }
 
-
-    /* ========== EventBus ========== */
+    // eventbus
     @Override
     public void onEvent(GameEvent e) {
         if (e.getType() == GameEventType.WAVE_START_REQUEST) {
@@ -150,7 +134,7 @@ public final class WaveManager implements GameEventListener {
         }
     }
 
-    /* ========== yeni dalga ========== */
+    // new wave start
     public void startNextWave() {
         currentWave++;
         if (currentWave >= waves.size()) {
@@ -178,7 +162,9 @@ public final class WaveManager implements GameEventListener {
     }
 
     private void enqueue(int n, Runnable r) { for (int i = 0; i < n; i++) queue.add(r); }
-    /* ----- spawn helpers ----- */
+
+
+    // spawn helpers //
     private void spawnGoblin(){
         Vector2 spawn = spawnManager.getRandomSpawnPoint();
         game.getGoblins().add(factory.createGoblin(
@@ -196,12 +182,9 @@ public final class WaveManager implements GameEventListener {
         game.getBarrels().add(factory.createBarrelBomber(
             game.getPlayer(), game, game.getBarrels(), spawn.x, spawn.y));
     }
-    public int getCurrentWave() {
-        return currentWave;
-    }
-    public boolean isNpcInteractable() {
-        return state == State.PRE_WAVE || state == State.INTERVAL;
-    }
+
+
+
 
 
 }

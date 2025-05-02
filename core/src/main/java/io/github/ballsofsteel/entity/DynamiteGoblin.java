@@ -1,6 +1,5 @@
 package io.github.ballsofsteel.entity;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
@@ -11,14 +10,14 @@ import io.github.ballsofsteel.ui.HealthBarRenderer;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Dinamitçi goblin – kaçarken engelden “sörf” yapmaz, duvara takılmaz. */
+// dynamite goblin class extending baseenemy class
 public class DynamiteGoblin extends BaseEnemy {
 
-    /* ── sabitler ── */
+    // constants
     private static final float SCALE=1f/72f, KEEP=2.8f, THROW=4.2f,
         SPEED=1.7f, MAX_HP=60f, CD=1.2f;
 
-    /* ── sprite / anim ── */
+    // sprite - animation
     private static final Texture SHEET = new Texture("Goblin/dynamite_goblin.png");
     private static final Texture BOOMS = new Texture("Dynamite/explosions_dynamite.png");
     private static final Texture DEAD  = new Texture("deadanimation.png");
@@ -35,11 +34,13 @@ public class DynamiteGoblin extends BaseEnemy {
         deathA= BaseEnemy.row(DEAD ,2,2,1792,128,14,.07f);
     }
 
-    /* ── referans & durum ── */
-    private final Player player; private final CoreGame game;
-    private final List<DynamiteGoblin> crowd; private final List<GoldBag> loot;
-    private enum ST{MOVE,THROW,DIE} private ST st=ST.MOVE;
-    private float tThrow,stateT,cd=0; private boolean released;
+    // reference and states
+    private final Player player;
+    private final List<DynamiteGoblin> crowd;
+    private final List<GoldBag> loot;
+    private enum ST{MOVE,THROW,DIE}  private ST st=ST.MOVE;
+    private float tThrow,stateT,cd=0;
+    private boolean released;
     private final ArrayList<Dynamite> bombs=new ArrayList<>();
 
     /* A* */
@@ -48,11 +49,12 @@ public class DynamiteGoblin extends BaseEnemy {
 
     public DynamiteGoblin(Player p,CoreGame g,List<DynamiteGoblin> same,
                           List<GoldBag> loot,float sx,float sy){
-        super(sx,sy,MAX_HP,g.getMap());           //  <-- map’i ilet
-        player=p; game=g; crowd=same; this.loot=loot;
+        super(sx,sy,MAX_HP,g.getMap());           // send the map
+        player=p;
+        crowd=same; this.loot=loot;
     }
 
-    /* ───────────────── update ───────────────── */
+    // update
     public void update(float dt){
 
         baseUpdate(dt); bombs.removeIf(b->b.update(dt));
@@ -73,25 +75,25 @@ public class DynamiteGoblin extends BaseEnemy {
             return;
         }
 
-        /* ----- hareket ----- */
-        if(dist<KEEP){                        // kaç
+        // movement
+        if(dist<KEEP){                        // flee
             tryMove(x - dx/dist*SPEED*dt*0.8f,
                 y - dy/dist*SPEED*dt*0.8f, dt);
 
-        } else if(dist>THROW){                // yaklaş
+        } else if(dist>THROW){                // come closer
             movePath(player.getX(),player.getY(),dt);
 
-        } else if(cd<=0){                     // fırlat
+        } else if(cd<=0){                     // throw
             st=ST.THROW; tThrow=0; released=false; cd=CD;
         }
     }
 
-    /* güvenli adım */
+    // safe move
     private void tryMove(float nx,float ny,float dt){
         if(!map.isCellBlocked((int)nx,(int)ny,null)){ x=nx; y=ny; }
     }
 
-    /* A* takip */
+    // a* pathfinding
     private void movePath(float tx,float ty,float dt){
         timer-=dt;
         if(timer<=0||idx>=path.size()){
@@ -105,7 +107,7 @@ public class DynamiteGoblin extends BaseEnemy {
         }
     }
 
-    /* ───────────────── render / damage vs ───────────────── */
+    // render & damage
     public void render(SpriteBatch b){
         bombs.forEach(d->d.render(b));
         boolean left=player.getX()<x;
@@ -132,7 +134,7 @@ public class DynamiteGoblin extends BaseEnemy {
     @Override public boolean isDead(){ return st==ST.DIE&&deathA.isAnimationFinished(stateT); }
     @Override public boolean isDying(){ return st==ST.DIE&&!isDead(); }
 
-    /* ───────── iç sınıf: Dinamit ───────── */
+    // inner class dynamite
     private class Dynamite{
         float rotation = 0f;
         Vector2 pos=new Vector2(), vel=new Vector2(); float fuse=1.1f,boomT;
@@ -158,12 +160,12 @@ public class DynamiteGoblin extends BaseEnemy {
             float h = fr.getRegionHeight() * s;
 
             if (exploding) {
-                // Patlama sabit çizilir (dönmez)
+                // explode animation
                 b.draw(fr,
                     pos.x - w / 2f, pos.y - h / 2f,
                     w, h);
             } else {
-                // Sadece uçan dinamit döner
+                // in air dynamite rotation
                 b.draw(fr,
                     pos.x - w / 2f, pos.y - h / 2f,
                     w / 2f, h / 2f,   // origin

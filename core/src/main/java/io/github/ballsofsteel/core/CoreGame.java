@@ -24,9 +24,7 @@ import io.github.ballsofsteel.screen.PauseManager;
 
 import java.util.*;
 
-/**
- * Ana oyun sınıfı – tüm döngü, HUD, dalga ve upgrade menüsü yönetimi.
- */
+// CoreGame
 public class CoreGame extends ApplicationAdapter implements GameEventListener {
 
     /* ---------- render & kamera ---------- */
@@ -38,7 +36,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private CountdownOverlay countdown;
     private PauseManager pauseManager;
     private WaveCounterUI waveUI;
-
+    private WaveManager waveManager;
     /* ---------- varlık listeleri ---------- */
     private Player player;
     private NPC    npc;
@@ -46,18 +44,19 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private final List<DynamiteGoblin> dynas    = new ArrayList<>();
     private final List<BarrelBomber>   barrels  = new ArrayList<>();
     private final List<GoldBag>        loot     = new ArrayList<>();
+    private final GameEntityFactory factory = new GameEntityFactory();
 
     /* ---------- HUD & upgrade menüsü ---------- */
     private InventoryHUD hud;
     private GoldCounterUI goldUI;
     private UpgradeMenu upgradeMenu;
-    private InputMultiplexer inputMultiplexer;
-    /* ---------- factory & dalga yöneticisi ---------- */
-    private final GameEntityFactory factory = new GameEntityFactory();
-    private WaveManager waveManager;
+
+
+    // shader program
     private ShaderProgram grayscaleShader;
 
 
+    // player death
     private boolean playerDead = false;
     private float deathTimer = 0f;
     private float deathAnimDuration = 2.1f; // Set this to your death animation's duration
@@ -65,29 +64,43 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     private float deathZoomEnd = 1.5f; // How much to zoom in
 
 
-    /* ---------------------------------------------------------------------- */
-    /*  create                                                                */
-    /* ---------------------------------------------------------------------- */
+
+   // create
+
     @Override
     public void create() {
         Fonts.load();
         grayscaleShader = ShaderManager.createGrayscaleShader();
         batch = new SpriteBatch();
         cam.setToOrtho(false, 21, 12.35f);
-        //21, 12.35f
 
         map    = new TileMapRenderer(cam, "maps/tileset2.tmx");
         player = factory.createPlayer(this, cam, map, 31, 45);
 
-        /* NPC – diyalog & yükseltme tetikleyici */
+
         npc = factory.createNPC(this, 26, 45);
 
         npc.setDialoguesForWave(-1, new String[]{
-            "Hello, brave hero!",
-            "I am the Goblin Slayer!",
-            "Let me know when you're ready."
+            "Welcome, brave knight.",
+            "We are in dire need.",
+            "You are our only hope!",
+            "Goblins destroyed our..",
+            "...village out in the woods!",
+            "They have built their...",
+            "...camps there.",
+            "They have been attacking...",
+            "...the town since then.",
+            "All our guards deserted...",
+            "...their posts!",
+            "We have sent word to...",
+            "...the king.",
+            "But it will take time...",
+            "...until the help comes!",
+            "You must defend...",
+            "...the town as long as...",
+            "...you can!"
         });
-        npc.setDialoguesForWave(0, new String[]{ // Sadece ilk wave başlatır, upgrade yok
+        npc.setDialoguesForWave(0, new String[]{
             "Here they come! Prepare yourself!"
         });
         npc.setDialoguesForWave(1, new String[]{
@@ -112,21 +125,19 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         });
 
 
-        /* HUD */
+
+        // hud , ui , wave manager,  upgrade menu
         hud = new InventoryHUD();
         hud.initializeCamera(1200, 800);
         hud.loadTextures();
         goldUI = new GoldCounterUI(hud.getCamera());
         waveUI = new WaveCounterUI(hud.getCamera());
-
-        // camera shake
         cameraShake = new CameraShake(cam);
-        /* Upgrade menüsü & dalga yöneticisi */
         upgradeMenu = new UpgradeMenu();
         waveManager = new WaveManager(this, factory);
 
 
-        overlayStage = new Stage(new ScreenViewport());   // önce stage oluştur
+        overlayStage = new Stage(new ScreenViewport());   // firstly create stage
         BitmapFont bigFont = new BitmapFont();
         bigFont.getData().setScale(1f);
         countdown = new CountdownOverlay(0.7f);
@@ -149,10 +160,10 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         multiplexer.addProcessor(upgradeMenu.getStage());
         Gdx.input.setInputProcessor(multiplexer);
 
-        /* Event dinleme */
+        // event listener
         EventBus.register(this);
 
-        /* Scroll ile HUD slot geçişi */
+        // slot changing with scroll
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean scrolled(float dx, float dy) {
                 if (dy > 0) hud.nextSlot(); else if (dy < 0) hud.prevSlot();
@@ -163,24 +174,22 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         Gdx.gl.glClearColor(0, 0, 0, 1);
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*  render (ana döngü)                                                    */
-    /* ---------------------------------------------------------------------- */
+
+    // render loop
+
     @Override
     public void render() {
         float dt = Gdx.graphics.getDeltaTime();
 
-        // 1) Update pause state
         pauseManager.update();
 
-        // 2) If paused — draw everything in full grayscale, then your pause UI, and return
         if (pauseManager.isPaused()) {
-            renderPausedState();     // ← now actually applies grayscale!
+            renderPausedState();
             pauseManager.render();
             return;
         }
 
-        // 3) Normal “alive” or “death” logic
+        //alive or death logic//
         player.update(dt);
 
         if (!playerDead && player.getHealth() <= 0f) {
@@ -210,7 +219,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
             return;
         }
 
-        // 4) Fully running game
+
         handleInput(dt);
         if (!upgradeMenu.isVisible()) {
             npc.update(dt, new Vector2(player.getX(), player.getY()));
@@ -229,7 +238,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         upgradeMenu.render(batch);
     }
 
-    /** Draws the entire world+entities in full grayscale when paused. */
+
     private void renderPausedState() {
         // clear first
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -265,7 +274,6 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     }
 
 
-
     private void renderDeathState(float dt) {
         deathTimer += dt;
         float grayscaleIntensity = Math.min(deathTimer / deathAnimDuration, 1f);
@@ -283,7 +291,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         batch.setShader(grayscaleShader);
         batch.begin();
         goblins.forEach(g -> g.render(batch));
-        // … etc …
+        // ... etc ...
         player.render(batch);
         batch.end();
 
@@ -292,13 +300,13 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         batch.setShader(null);
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*  handleInput                                                           */
-    /* ---------------------------------------------------------------------- */
+
+    // input handling
+
     private void handleInput(float dt) {
 
-        upgradeMenu.handleInput();            // menü tuşları
-        if (upgradeMenu.isVisible()) return;  // menü açıksa başka giriş yok
+        upgradeMenu.handleInput();
+        if (upgradeMenu.isVisible()) return;
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)) hud.nextSlot();
         if (Gdx.input.isKeyJustPressed(Input.Keys.LEFT )) hud.prevSlot();
@@ -310,26 +318,23 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) useSelectedItem();
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*  EventBus callback                                                     */
-    /* ---------------------------------------------------------------------- */
+   // eventbus callback
     @Override
     public void onEvent(GameEvent e) {
         GameEventType t = e.getType();
         switch (t) {
             case WAVE_COUNTDOWN:
-                int n = (Integer) e.getPayload();
+                int n = e.getPayload();
                 countdown.showNumber(n);
                 break;
             case UPGRADE_MENU_REQUEST:
                 int wave = 0;
-                if (e.getPayload() != null) wave = (Integer) e.getPayload();
-                if (wave >= 1 && wave < 4 && !upgradeMenu.isVisible()) {
+                if (e.getPayload() != null) wave = e.getPayload();
+                if (wave >= 1 && wave < 7 && !upgradeMenu.isVisible()) {
                     upgradeMenu.show(player, wave);
                 }
                 break;
             case UPGRADE_SELECTED:
-                // upgradeMenu.hide();  // <-- REMOVE THIS LINE
                 waveManager.startNextWave();
                 break;
             case WAVE_START_REQUEST:
@@ -337,9 +342,9 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
                 break;
         }
     }
-    /* ---------------------------------------------------------------------- */
-    /*  Dünya & HUD çizimi yardımcıları                                       */
-    /* ---------------------------------------------------------------------- */
+
+
+      // world and hud printing helpers // =======
     private void updateLoot() {
         for (Iterator<GoldBag> it = loot.iterator(); it.hasNext();) {
             GoldBag g = it.next();
@@ -361,30 +366,29 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     }
 
     private void renderWorld() {
-        map.renderBase(); // Ground + Building + Water + Collision
+        map.renderBase(); // layer printing
 
-        // Çalıları çiz (eğer shader kullanmak istiyorsan ikinci parametre true)
+        //bushes
         map.renderBush(player, 50f, player.isInBush());
 
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
 
-        // ALTTA KALACAK VARLIKLAR
+        // render queue
+        loot.forEach(g -> g.render(batch));
         goblins.forEach(g -> g.render(batch));
         dynas.forEach(d -> d.render(batch));
         barrels.forEach(b -> b.render(batch));
-        loot.forEach(g -> g.render(batch));
 
-        // NPC önce çizilirse, player onun üstüne çıkabilir
+
         npc.render(batch, new Vector2(player.getX(), player.getY()));
 
-        // PLAYER HER ZAMAN EN SON
         player.render(batch);
 
         batch.end();
 
-        // AĞAÇLAR EN SON — Shader varsa burada yarı saydam geçişli olur
         map.renderTreeTop(player, 90f, map.isCellTreeTop((int)player.getX(), (int)player.getY()));
+
     }
 
 
@@ -392,19 +396,19 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         float dt = Gdx.graphics.getDeltaTime();
         hud.drawHUD(player);
         goldUI.draw();
-        waveUI.setWave(waveManager.getCurrentWave());
+        waveUI.setWave(waveManager.getCurrentWave() + 1);
         waveUI.draw();
         batch.setProjectionMatrix(cam.combined);
         batch.begin();
 
-        /* oyuncu can barı */
+
         HealthBarRenderer.drawBar(batch,
             player.getX(),
             player.getY() + player.getSpriteHeight()/2f + .25f,
             player.getHealth() / player.getMaxHealth(),
             false);
 
-        /* goblin can barları */
+        // goblin health bars
         for (Goblin g : goblins) {
             if (!g.isDead() && !g.isDying())
                 HealthBarRenderer.drawBar(batch,
@@ -419,9 +423,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         batch.end();
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*  Envanter kullanımı                                                    */
-    /* ---------------------------------------------------------------------- */
+
     private void useSelectedItem() {
         int idx = hud.getSelectedSlot();
         if (idx < player.getInventory().getItems().size()) {
@@ -431,9 +433,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         }
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*  dispose                                                               */
-    /* ---------------------------------------------------------------------- */
+    //dispose
     @Override
     public void dispose() {
         upgradeMenu.dispose();
@@ -455,9 +455,9 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
         Fonts.dispose();
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*  Getter’lar                                                            */
-    /* ---------------------------------------------------------------------- */
+
+    // Getters
+
     public List<Goblin>         getGoblins()  { return goblins;  }
     public List<DynamiteGoblin> getDynaList() { return dynas;    }
     public List<BarrelBomber>   getBarrels()  { return barrels;  }
@@ -467,15 +467,7 @@ public class CoreGame extends ApplicationAdapter implements GameEventListener {
     public TileMapRenderer      getMap()      { return map;      }
     public CameraShake getCameraShake()       { return cameraShake;}
     public boolean isIntervalActive() { return WaveManager.isIntervalActive();}
-    public WaveManager getWaveManager() {
-        return waveManager;
-    }
-    public UpgradeMenu getUpgradeMenu() {
-        return upgradeMenu;
-    }
-    public boolean isNpcInteractable() {
-        return waveManager != null && waveManager.isNpcInteractable();
-    }
-
-    public void addGoblin(Goblin g) { goblins.add(g); }
+    public WaveManager getWaveManager() {return waveManager;}
+    public UpgradeMenu getUpgradeMenu() {return upgradeMenu;}
 }
+

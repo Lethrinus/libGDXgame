@@ -6,18 +6,15 @@ import com.badlogic.gdx.scenes.scene2d.*;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.*;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
-import io.github.ballsofsteel.screen.MenuScreen;
 import io.github.ballsofsteel.ui.Fonts;
 
 public class PauseManager {
 
     private boolean paused = false;
     private final Stage stage;
-    private final Game game;
     private final InputProcessor gameplayInput;
 
     public PauseManager(Game game, InputProcessor gameplayInput, TextureAtlas atlas) {
-        this.game = game;
         this.gameplayInput = gameplayInput;
 
         stage = new Stage(new ScreenViewport());
@@ -26,7 +23,7 @@ public class PauseManager {
         skin.add("default-font", Fonts.HUD);
         skin.add("title-font", Fonts.TITLE);
 
-        // Stil tanımları
+        // style buttons
         TextButton.TextButtonStyle blue = new TextButton.TextButtonStyle();
         blue.up = new TextureRegionDrawable(atlas.findRegion("Button_Blue_3Slides"));
         blue.down = new TextureRegionDrawable(atlas.findRegion("Button_Blue_3Slides_Pressed"));
@@ -41,7 +38,7 @@ public class PauseManager {
 
         skin.add("title", new Label.LabelStyle(Fonts.TITLE, com.badlogic.gdx.graphics.Color.WHITE));
 
-        // Arayüz
+        // interface
         Table root = new Table();
         root.setFillParent(true);
         stage.addActor(root);

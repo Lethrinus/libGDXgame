@@ -6,16 +6,15 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.core.CoreGame;
-import io.github.ballsofsteel.core.TileMapRenderer;
 import io.github.ballsofsteel.ui.HealthBarRenderer;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Yakın dövüş goblini – ortak fonksiyonlar BaseEnemy’de. */
+// goblin class which extends BaseEnemy
 public class Goblin extends BaseEnemy {
 
-    /* ───────── sabitler ───────── */
+    // constants
     private static final float SCALE          = 1f / 72f;
     private static final float SEPARATE_DIST2 = 0.40f;
     private static final float SEPARATE_SPEED = 1.5f;
@@ -28,18 +27,18 @@ public class Goblin extends BaseEnemy {
     private static final float ATTACK_CD      = 0.9f;
     private static final float GOLD_SPREAD    = .8f;
 
-    /* ───────── referanslar ───────── */
+    // references
     private final Player        player;
     private final List<Goblin>  crowd;
     private final List<GoldBag> loot;
     private final CoreGame      game;
 
-    /* ───────── animasyonlar ───────── */
+    // animations
     private final Animation<TextureRegion> runR, runL, idleR, idleL;
     private final Animation<TextureRegion> atkR, atkL, atkU, atkD;
     private final Animation<TextureRegion> deathAnim;
 
-    /* ───────── durum ───────── */
+    // state
     private enum ST { MOVE, ATTACK, DIE }
     private ST     st          = ST.MOVE;
     private float  moveT       = 0f;
@@ -49,7 +48,7 @@ public class Goblin extends BaseEnemy {
     private boolean attackDone = false;
     private boolean facingRight= true;
 
-    /* ───────── A* yol verisi ───────── */
+    // a* path data
     private List<Vector2> path = new ArrayList<>();
     private int   pathIdx      = 0;
     private float pathTimer    = 0f;
@@ -78,10 +77,10 @@ public class Goblin extends BaseEnemy {
         deathAnim = BaseEnemy.row(dead , 2,   2, 1792,128,14,.10f);
     }
 
-    /* =================================================== */
+    // update method
     public void update(float dt) {
 
-        baseUpdate(dt);                       // knock-back & flaş
+        baseUpdate(dt);                       // knockback and flash
 
         if (st == ST.DIE) { deathT += dt; return; }
 
@@ -117,11 +116,11 @@ public class Goblin extends BaseEnemy {
         y = MathUtils.clamp(y,.5f, game.getMap().getMapHeight()-.5f);
     }
 
-    /* ---------------- kovalama / path ---------------- */
+    // chase & pathfinding
     private void steerTowardsPlayer(float dt,
                                     float dx,float dy,float dist){
 
-        /* yol yenileme */
+        // path refreshing
         pathTimer -= dt;
         if (pathTimer <= 0f || pathIdx >= path.size()) {
             path = findPath(game.getMap(),
@@ -132,7 +131,7 @@ public class Goblin extends BaseEnemy {
             pathTimer = REPLAN_INTERVAL;
         }
 
-        /* A* üzerinde ilerle */
+        // move along with A*
         if (pathIdx < path.size()) {
             Vector2 goal = path.get(pathIdx);
             float gx = goal.x - x, gy = goal.y - y;
@@ -146,7 +145,7 @@ public class Goblin extends BaseEnemy {
                 if (canMoveTo(game.getMap(), nx, ny)) { x=nx; y=ny; }
                 facingRight = gx > 0;   moveT += dt;
             }
-        } else if (dist > ATTACK_RADIUS*0.8f) {      // doğrudan koş
+        } else if (dist > ATTACK_RADIUS*0.8f) {      // run straight to player
             float mv = SPEED*dt;
             float nx = x + (dx/dist)*mv;
             float ny = y + (dy/dist)*mv;
@@ -154,7 +153,7 @@ public class Goblin extends BaseEnemy {
         }
     }
 
-    /* =================================================== */
+    // render method
     public void render(SpriteBatch b){
         TextureRegion fr;
         if (st==ST.DIE) fr = deathAnim.getKeyFrame(deathT);
@@ -177,7 +176,7 @@ public class Goblin extends BaseEnemy {
             HealthBarRenderer.drawBar(b, x, y+.8f, hp/maxHp, true);
     }
 
-    /* =================================================== */
+    // taking damage
     @Override public void takeDamage(float dmg,float kb,float angDeg){
         if(st==ST.DIE) return;
         super.takeDamage(dmg,kb,angDeg);

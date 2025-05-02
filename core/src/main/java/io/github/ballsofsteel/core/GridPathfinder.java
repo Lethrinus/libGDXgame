@@ -60,11 +60,11 @@ public class GridPathfinder {
                 int nx = current.x + d[0];
                 int ny = current.y + d[1];
 
-                // sınır ve engel kontrolü
+                // obstacle and border check
                 if (nx < 0 || ny < 0 || nx >= w || ny >= h || !passable[nx][ny] || closed[nx][ny])
                     continue;
 
-                // diagonal köşe geçiş kontrolü
+                // diagonal corner movement check
                 if (d[0] != 0 && d[1] != 0) {
                     if (!passable[current.x + d[0]][current.y] || !passable[current.x][current.y + d[1]])
                         continue;

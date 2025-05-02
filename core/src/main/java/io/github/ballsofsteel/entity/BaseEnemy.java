@@ -8,47 +8,26 @@ import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
 import io.github.ballsofsteel.core.GridPathfinder;
 import io.github.ballsofsteel.core.TileMapRenderer;
-
-import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Enemy üst-sınıfı – tüm yaratıkların ortak ihtiyaçlarını tutar:
- *
- * • Pozisyon (x / y)
- * • HP, knock-back, kırmızı flaş geri bildirimi
- * • Hasar alma {@link #takeDamage}
- * • Knock-back ve flaş zamanlayıcısını yürüten {@link #baseUpdate}
- *
- * • Sprite-sheet’ten satır animasyonu oluşturan {@link #row} ve yansıtma {@link #mirror}
- * • Kalabalıktan uzaklaştırma  {@link #separateFromCrowd}
- * • Basit çarpışma kontrolü    {@link #canMoveTo}
- * • Tek seferlik A* yol üretimi {@link #findPath}
- *
- * **Kullanım (alt sınıflarda):**
- *   –  Ctor’da super(x, y, maxHp) çağır.
- *   –  update(dt) içinde ilk satırda baseUpdate(dt) çağır.
- *   –  Hasar aldığında super.takeDamage(d,k,a) kullan.
- *   –  İhtiyaca göre yardımcı metodları çağır.
- */
+
 public abstract class BaseEnemy {
 
-    /* ------------------------------------------------------------------ */
-    /*  TEMEL ALANLAR                                                     */
-    /* ------------------------------------------------------------------ */
-    protected float x, y;                 // dünya koordinatı (merkez)
+    // basis fields
+    protected float x, y;                 // world coordinate *(center)*
     protected final float maxHp;
     protected float hp;
     private final Polygon bbox = new Polygon(new float[]{
             -0.3f,-0.3f, 0.3f,-0.3f, 0.3f,0.3f, -0.3f,0.3f});
-    /* Knock-back ivmesi (her karede azalacak) */
+
+    // knockback acceleration
     protected final Vector2 knock = new Vector2();
 
 
     protected TileMapRenderer map;
 
 
-    /* Hasar sonrası kırmızı flaş */
+    // red flash after taking damage
     protected static final float FLASH_TIME = .15f;
     protected float flashTimer = 0f;
 
@@ -61,25 +40,23 @@ public abstract class BaseEnemy {
         this.map   = map;               // <— ekledik
     }
 
-    /* ------------------------------------------------------------------ */
-    /** Alt sınıfın update(dt) fonksiyonunun *başında* çağrılmalı. */
+
     protected void baseUpdate(float dt){
 
-        /* güvenli knock-back */
+        // safe knockback
         if(knock.len2()>.0001f){
             float nx = x + knock.x*dt;
             float ny = y + knock.y*dt;
             bbox.setPosition(nx,ny);
-            if(!map.isCellBlocked((int)nx,(int)ny,bbox)){   // geçilebiliyorsa uygula
+            if(!map.isCellBlocked((int)nx,(int)ny,bbox)){   // if passable apply
                 x = nx; y = ny;
-            } else knock.setZero();                         // aksi hâlde dur
+            } else knock.setZero();                         // stop instead
             knock.scl(1 - dt*4f);
         }
         if(flashTimer>0) flashTimer-=dt;
     }
 
-    /* ------------------------------------------------------------------ */
-    /** Ortak hasar alma – alt sınıflar super() çağırıp ek işlem yapabilir. */
+
     public void takeDamage(float dmg, float knockForce, float angleDeg) {
         hp -= dmg;
         flashTimer = FLASH_TIME;
@@ -89,19 +66,7 @@ public abstract class BaseEnemy {
                 MathUtils.sin(rad) * knockForce);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  ANİMASYON YARDIMCILARI                                            */
-    /* ------------------------------------------------------------------ */
-
-    /**
-     * Sprite-sheet’in tek satırından Animation üretir.
-     *
-     * @param tex   Sprite sheet Texture
-     * @param x,y   Satırın sol-üst px koordinatı
-     * @param w,h   Satırın genişlik / yükseklik px
-     * @param n     Kare sayısı
-     * @param dur   Bir kare süresi (saniye)
-     */
+    // animation helpers
     public static Animation<TextureRegion> row(
             Texture tex, int x, int y,
             int w, int h, int n, float dur) {
@@ -111,7 +76,6 @@ public abstract class BaseEnemy {
         return new Animation<>(dur, frames);
     }
 
-    /** Verilen animasyonun soldan sağa yansıtılmış kopyası. */
     public static Animation<TextureRegion> mirror(Animation<TextureRegion> src) {
         TextureRegion[] orig = src.getKeyFrames();
         TextureRegion[] mirr = new TextureRegion[orig.length];
@@ -122,18 +86,7 @@ public abstract class BaseEnemy {
         return new Animation<>(src.getFrameDuration(), mirr);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  KALABALIKTAN UZAKLAŞTIRMA                                         */
-    /* ------------------------------------------------------------------ */
-
-    /**
-     * Aynı türden yaratık listesini iterek çakışmayı engeller.
-     *
-     * @param crowd    Bu düşman dâhil *tüm* düşmanlar
-     * @param minDist2 İstenilen minimum mesafe² (d²)
-     * @param speed    Ayırma hızı (dünya-birimi/sn)
-     * @param dt       Delta-time
-     */
+    // seperating from crowd
     protected void separateFromCrowd(List<? extends BaseEnemy> crowd,
                                      float minDist2,
                                      float speed,
@@ -156,15 +109,7 @@ public abstract class BaseEnemy {
         }
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  BASİT ÇARPIŞMA KONTROLÜ                                           */
-    /* ------------------------------------------------------------------ */
-
-    /**
-     * Verilen hedef koordinata gidilebilir mi?
-     *  – 0.3 × 0.3f’lik kare polygon kullanır
-     *  – Yalnızca TileMapRenderer.isCellBlocked(…) çağırır
-     */
+   // basic collision control
     protected boolean canMoveTo(TileMapRenderer map,
                                 float targetX, float targetY) {
 
@@ -180,17 +125,8 @@ public abstract class BaseEnemy {
                 poly);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  BASİT YOL BULMA (A*)                                              */
-    /* ------------------------------------------------------------------ */
 
-    /**
-     * GridPathfinder üzerinden yeni yol döner.
-     * Başlangıç hücresi merkez noktası listede kalırsa ilk eleman silinir,
-     * böylece yaratık geriye adım atmaz.
-     *
-     * @return Başından sonuna düğüm listesi (hücre merkezi koordinatları)
-     */
+   // basic pathfinding a* algorithm
     protected List<Vector2> findPath(TileMapRenderer map,
                                      int sx, int sy,   // start tile
                                      int tx, int ty) { // target tile
@@ -208,17 +144,13 @@ public abstract class BaseEnemy {
         return raw;
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  BASİT GETTER’LAR                                                  */
-    /* ------------------------------------------------------------------ */
+    // getters
+
     public float  getX()         { return x; }
     public float  getY()         { return y; }
     public float  getHealth()    { return hp; }
     public float  getMaxHealth() { return maxHp; }
-
-    /** Death animasyonu bittiğinde true dönmeli (alt sınıf override). */
     public boolean isDead()  { return hp <= 0f; }
-
-    /** Death animasyonu oynarken true (varsayılan: hiç oynamaz). */
     public boolean isDying() { return false; }
+
 }

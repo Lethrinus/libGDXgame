@@ -2,10 +2,7 @@ package io.github.ballsofsteel.entity;
 
 import com.badlogic.gdx.graphics.Texture;
 
-/**
- * An item that heals the player when used.
- * Also displays a healing animation when consumed.
- */
+
 public class MeatItem extends Item {
     private float healAmount;
 

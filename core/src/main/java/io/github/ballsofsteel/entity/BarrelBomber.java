@@ -10,10 +10,10 @@ import io.github.ballsofsteel.core.CoreGame;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Varil bombacısı – artık vurulamaz; yalnızca patlar. */
+// barrel bomber instantly explodes
 public class BarrelBomber extends BaseEnemy {
 
-    /* sprite & animasyon ------------------------------------------------ */
+    // sprite and animation
     private static final Texture SHEET = new Texture(Gdx.files.internal("Goblin/barrel_atlas.png"));
     private static final Texture BOOM  = new Texture(Gdx.files.internal("Dynamite/explosions_dynamite.png"));
     private static final Animation<TextureRegion>
@@ -27,7 +27,7 @@ public class BarrelBomber extends BaseEnemy {
         explodeA = BaseEnemy.row(BOOM , 2,  68,1728,192,9,.07f);
     }
 
-    /* sabitler ----------------------------------------------------------- */
+    // constants
     private static final float SCALE          = 1f/72f;
     private static final float SPEED          = 1.7f;
     private static final float SEPARATE_DIST2 = .45f*.45f*4f;
@@ -35,7 +35,7 @@ public class BarrelBomber extends BaseEnemy {
     private static final float DAMAGE_RADIUS  = 2f;
     private static final float PREP_DIST      = 1.3f;
 
-    /* referans / state --------------------------------------------------- */
+    // reference  & state
     private final Player player;
     private final CoreGame core;
     private final List<BarrelBomber> crowd;
@@ -45,7 +45,7 @@ public class BarrelBomber extends BaseEnemy {
     private boolean damageApplied=false;
     private float baseY, hop;
 
-    /* A* verisi */
+    // a* pathfinding
     private List<Vector2> path=new ArrayList<>();
     private int   pathIdx=0;   private float pathTimer=0;
     private static final float REPLAN=.5f;
@@ -59,10 +59,10 @@ public class BarrelBomber extends BaseEnemy {
         baseY=sy;
     }
 
-    /* update ------------------------------------------------------------- */
+    // update
     public void update(float dt){
 
-        baseUpdate(dt);          // sadece knock-back (vurulamasa da)
+        baseUpdate(dt);          // knockback
 
         if(preparing){ preT+=dt; if(prepareA.isAnimationFinished(preT)){
             preparing=false; exploding=true; boomT=0;
@@ -81,10 +81,10 @@ public class BarrelBomber extends BaseEnemy {
             return;
         }
 
-        /* separation */
+        // seperation
         separateFromCrowd(crowd, SEPARATE_DIST2, SEPARATE_SPEED, dt);
 
-        /* A* yol bul + hareket */
+        // a* movement
         pathTimer-=dt;
         if(pathTimer<=0||pathIdx>=path.size()){
             path=findPath(core.getMap(),
@@ -105,16 +105,16 @@ public class BarrelBomber extends BaseEnemy {
             }
         }
 
-        /* yaklaştıysa patlamaya hazırlan */
+        // if close to player, prepare to explode
         float dx=player.getX()-x, dy=player.getY()-baseY;
         facingLeft = dx<0;
         if(Math.sqrt(dx*dx+dy*dy)<PREP_DIST){ preparing=true; preT=0; }
 
-        /* hop hareketi */
+        // hopping
         tAnim+=dt; hop=Math.abs(MathUtils.sin(tAnim*3f))*0.35f;
     }
 
-    /* render ------------------------------------------------------------- */
+    // render
     public void render(SpriteBatch b){
         TextureRegion fr =
             preparing ? prepareA.getKeyFrame(preT,false)
@@ -128,7 +128,7 @@ public class BarrelBomber extends BaseEnemy {
         }
     }
 
-    /* vurulamaz ---------------------------------------------------------- */
+    // cannot be hit
 
 
     @Override public boolean isDead ()  { return finished; }

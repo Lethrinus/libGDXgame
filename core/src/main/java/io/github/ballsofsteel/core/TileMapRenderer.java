@@ -80,8 +80,9 @@ public class TileMapRenderer {
             return;
         }
 
-        if (circleShader == null)
+        if (circleShader == null) {
             circleShader = ShaderManager.createCircleShader();
+        }
 
         Batch b = renderer.getBatch();
         b.setShader(circleShader);
@@ -140,7 +141,7 @@ public class TileMapRenderer {
     private int layerIndex(String name){
         MapLayer l = map.getLayers().get(name);
         if (l == null)
-            throw new IllegalArgumentException("Katman bulunamadı: " + name);
+            throw new IllegalArgumentException("layer not found: " + name);
         return map.getLayers().getIndex(name);
     }
 
@@ -154,8 +155,7 @@ public class TileMapRenderer {
 
     private boolean cellExists(String layerName, int x, int y) {
         MapLayer l = map.getLayers().get(layerName);
-        if (!(l instanceof TiledMapTileLayer)) return false;
-        TiledMapTileLayer tl = (TiledMapTileLayer) l;
+        if (!(l instanceof TiledMapTileLayer tl)) return false;
 
         if (x < 0 || y < 0 || x >= mapWidthTiles || y >= mapHeightTiles)
             return false;

@@ -3,7 +3,6 @@ package io.github.ballsofsteel.ui;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
-import io.github.ballsofsteel.ui.Fonts;
 
 public final class WaveCounterUI {
 
@@ -22,11 +21,11 @@ public final class WaveCounterUI {
     public WaveCounterUI(OrthographicCamera hudCamera) {
         this.cam   = hudCamera;
         this.batch = new SpriteBatch();
-        this.icon  = new Texture("HUD/wave_icon.png");  // ikon dosyasını sen belirle (128x128 önerilir)
+        this.icon  = new Texture("HUD/wave_icon.png");  // icon file
     }
 
     public void setWave(int wave) {
-        this.wave = Math.max(1, wave + 1); // Always show at least 1
+        this.wave = wave;
     }
     public void draw() {
         batch.setProjectionMatrix(cam.combined);
@@ -35,7 +34,7 @@ public final class WaveCounterUI {
         float xI = PAD_PX;
         float yI = cam.viewportHeight - PAD_PX - ICON_PX;
 
-        String txt = "Wave " + (wave + 1);
+        String txt = "Wave " + (wave -1 );
         layout.setText(font, txt);
 
         float xT = xI + ICON_PX + GAP_PX;

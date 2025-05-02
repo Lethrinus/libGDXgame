@@ -22,38 +22,33 @@ import java.util.Map;
 
 public class NPC implements GameEventListener {
 
-    private float x, y;
-    private float interactionRadius = 2.0f;
+    private final float x, y;
+    private final float interactionRadius = 2.0f;
 
-    private Texture bubbleTexture;
-    private Texture pointerTexture;
-    private BitmapFont font;
+    private final Texture bubbleTexture;
+    private final Texture pointerTexture;
+    private final BitmapFont font;
 
     private final Map<Integer, String[]> waveDialogues = new HashMap<>();
     private String[] currentDialogue;
     private int currentLineIndex = 0;
     private boolean inDialogue = false;
     private boolean showPointer = true;
-    private boolean finishedDialogue = false;
 
-    private float typedSpeed = 20f;
     private float typedTimer = 0f;
     private int typedIndex = 0;
     private boolean typedComplete = false;
     private String typedText = "";
 
-    private float bubbleWidth = 4f;
-    private float bubbleHeight = 1f;
-
-    private Animation<TextureRegion> idleAnimation;
-    private Texture pawnTexture;
+    private final Animation<TextureRegion> idleAnimation;
+    private final Texture pawnTexture;
     private float stateTime = 0f;
 
     private float lastDistance = Float.MAX_VALUE;
     private static final float POINTER_DISTANCE = 1.2f;
     private static boolean firstWaveStarted = false;
 
-    private CoreGame game;
+    private final CoreGame game;
 
     public NPC(CoreGame game, float x, float y) {
         this.game = game;
@@ -107,13 +102,12 @@ public class NPC implements GameEventListener {
                         startTypingEffect(currentDialogue[currentLineIndex]);
                     } else {
                         inDialogue = false;
-                        finishedDialogue = true;
 
                         int wave = game.getWaveManager() != null ? game.getWaveManager().getCurrentWave() : -1;
                         boolean isStillInterval = game != null && game.isIntervalActive();
 
-                        if (wave == -1 || wave == 0) {
-                            // First wave: start wave directly, no upgrade menu
+                        if (!firstWaveStarted && (wave == -1 || wave == 0)) {
+                            firstWaveStarted = true;
                             EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
                         } else if (isStillInterval && wave >= 1 && wave < 4) {
                             // Show upgrade menu after dialogue, except last wave
@@ -123,9 +117,6 @@ public class NPC implements GameEventListener {
                         } else if (wave == 4) {
                             // Last wave: after dialogue, start last wave (no upgrade menu)
                             EventBus.post(new GameEvent(GameEventType.WAVE_START_REQUEST, null));
-                        } else if (wave == 5) {
-                            // Game completed
-                            EventBus.post(new GameEvent(GameEventType.GAME_COMPLETED, null));
                         }
                     }
                 }
@@ -134,6 +125,7 @@ public class NPC implements GameEventListener {
 
         if (inDialogue && !typedComplete) {
             typedTimer += delta;
+            float typedSpeed = 20f;
             int show = (int)(typedTimer * typedSpeed);
             int total = currentDialogue[currentLineIndex].length();
             if (show >= total) { show = total; typedComplete = true; }
@@ -197,8 +189,10 @@ public class NPC implements GameEventListener {
 
         if (!inDialogue || lastDistance > interactionRadius) return;
 
+        float bubbleWidth = 4f;
         float bubbleX = x - bubbleWidth * 0.5f;
         float bubbleY = y + 1.0f;
+        float bubbleHeight = 1f;
         batch.draw(bubbleTexture, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
 
         float centerX = bubbleX + bubbleWidth / 2f;
@@ -232,7 +226,6 @@ public class NPC implements GameEventListener {
     public float getX() { return x; }
     public float getY() { return y; }
     public void setPointerVisible(boolean visible) { this.showPointer = visible; }
-    public boolean isPointerVisible() { return showPointer; }
     private WaveManager getWaveManager() {
         return game != null ? game.getWaveManager() : null;
     }
@@ -249,7 +242,6 @@ public class NPC implements GameEventListener {
         switch (event.getType()) {
             case UPGRADE_SELECTED:
             case WAVE_START_REQUEST:
-                finishedDialogue = false;
                 break;
             default:
                 break;

@@ -2,7 +2,6 @@ package io.github.ballsofsteel.screen;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
@@ -14,7 +13,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
-import io.github.ballsofsteel.core.WaveManager;
 import io.github.ballsofsteel.entity.Player;
 import io.github.ballsofsteel.events.GameEvent;
 import io.github.ballsofsteel.events.GameEventType;
@@ -32,6 +30,7 @@ public final class UpgradeMenu {
     private Table upgradeTable;
     private Label goldLabel;
     private Label errorLabel;
+    private Table skipButtonTable;
 
     private boolean visible = false;
     private Player player;
@@ -41,14 +40,11 @@ public final class UpgradeMenu {
     private boolean blockKeyboard = true;
     private float errorMessageTimer = 0f;
     private InputProcessor previousInputProcessor;
-    // Wave-specific upgrades with costs
     private final Map<Integer, List<UpgradeOption>> waveUpgrades = new HashMap<>();
 
     public UpgradeMenu() {
-        /* ---------- Stage ---------- */
         stage = new Stage(new ScreenViewport());
 
-        /* ---------- Skin ---------- */
         skin = new Skin();
         skin.add("default-font", Fonts.HUD);
 
@@ -70,7 +66,7 @@ public final class UpgradeMenu {
         skin.add("error", errorStyle);
 
         TextButton.TextButtonStyle btn = new TextButton.TextButtonStyle();
-        btn.font = Fonts.HUD;
+        btn.font = Fonts.HUD_COMPACT;
         btn.up = skin.newDrawable("white", new Color(0.2f, 0.3f, 0.4f, 0.95f));
         btn.over = skin.newDrawable("white", new Color(0.3f, 0.4f, 0.6f, 1.0f));
         btn.down = skin.newDrawable("white", new Color(0.1f, 0.2f, 0.3f, 1.0f));
@@ -78,7 +74,7 @@ public final class UpgradeMenu {
         skin.add("upgrade", btn);
 
         TextButton.TextButtonStyle disabledBtn = new TextButton.TextButtonStyle();
-        disabledBtn.font = Fonts.HUD;
+        disabledBtn.font = Fonts.HUD_COMPACT;
         disabledBtn.up = skin.newDrawable("white", new Color(0.2f, 0.2f, 0.2f, 0.7f));
         disabledBtn.fontColor = Color.GRAY;
         skin.add("upgrade-disabled", disabledBtn);
@@ -88,34 +84,29 @@ public final class UpgradeMenu {
         win.background = skin.newDrawable("white", new Color(0f, 0f, 0f, 0.85f));
         skin.add("root", win);
 
-        // Initialize wave-specific upgrades
         setupWaveUpgrades();
         buildUI();
     }
 
     private void setupWaveUpgrades() {
-        // Wave 1 upgrades
         waveUpgrades.put(0, Arrays.asList(
             new UpgradeOption("HEALTH +25", Upgrade.HEALTH, 10, 25f),
             new UpgradeOption("DAMAGE +20%", Upgrade.DAMAGE, 15, 1.2f),
             new UpgradeOption("SPEED +15%", Upgrade.SPEED, 12, 1.15f)
         ));
 
-        // Wave 2 upgrades
         waveUpgrades.put(1, Arrays.asList(
             new UpgradeOption("HEALTH +50", Upgrade.HEALTH, 20, 50f),
             new UpgradeOption("DAMAGE +30%", Upgrade.DAMAGE, 25, 1.3f),
             new UpgradeOption("SPEED +25%", Upgrade.SPEED, 22, 1.25f)
         ));
 
-        // Wave 3 upgrades
         waveUpgrades.put(2, Arrays.asList(
             new UpgradeOption("HEALTH +75", Upgrade.HEALTH, 30, 75f),
             new UpgradeOption("DAMAGE +50%", Upgrade.DAMAGE, 35, 1.5f),
             new UpgradeOption("SPEED +40%", Upgrade.SPEED, 32, 1.4f)
         ));
 
-        // Wave 4 upgrades (final)
         waveUpgrades.put(3, Arrays.asList(
             new UpgradeOption("HEALTH +100", Upgrade.HEALTH, 45, 100f),
             new UpgradeOption("DAMAGE +75%", Upgrade.DAMAGE, 50, 1.75f),
@@ -128,7 +119,7 @@ public final class UpgradeMenu {
         root.pad(40);
         root.setModal(true);
         root.setMovable(false);
-        root.setWidth(600); // Fixed width
+        root.setWidth(500);
 
         Label title = new Label("CHOOSE AN UPGRADE", skin);
         title.setFontScale(1.4f);
@@ -146,7 +137,7 @@ public final class UpgradeMenu {
         ScrollPane.ScrollPaneStyle scrollStyle = new ScrollPane.ScrollPaneStyle();
         ScrollPane scrollPane = new ScrollPane(upgradeTable, scrollStyle);
         scrollPane.setFadeScrollBars(false);
-        scrollPane.setScrollingDisabled(true, false); // Only vertical scroll
+        scrollPane.setScrollingDisabled(true, false);
 
         root.add(scrollPane).height(240).width(520).padBottom(20).expandX().center().row();
 
@@ -156,11 +147,12 @@ public final class UpgradeMenu {
         errorLabel.setVisible(false);
         root.add(errorLabel).padBottom(10).center().row();
 
+        skipButtonTable = new Table();
+        root.add(skipButtonTable).center().row();
+
         root.pack();
-        root.setPosition(
-            (Gdx.graphics.getWidth() - root.getWidth()) / 2f,
-            (Gdx.graphics.getHeight() - root.getHeight()) / 2f
-        );
+        root.setPosition((Gdx.graphics.getWidth() - root.getWidth()) / 2f,
+            (Gdx.graphics.getHeight() - root.getHeight()) / 2f);
         stage.addActor(root);
 
         root.setColor(1, 1, 1, 0);
@@ -168,9 +160,9 @@ public final class UpgradeMenu {
         root.setVisible(false);
     }
 
-
     private void refreshUpgradeOptions() {
         upgradeTable.clear();
+        skipButtonTable.clear();
         List<UpgradeOption> options = waveUpgrades.getOrDefault(currentWave, Collections.emptyList());
         boolean canAfford = false;
 
@@ -179,7 +171,7 @@ public final class UpgradeMenu {
             String buttonText = (i + 1) + "  :  " + option.name + " (Cost: " + option.cost + " Gold)";
             TextButton b = new TextButton(buttonText, skin, "upgrade");
             b.pad(16, 0, 16, 0);
-            b.getLabel().setFontScale(1.1f);
+            b.getLabel().setFontScale(0.8f);
 
             if (player.getGold() < option.cost) {
                 b.setDisabled(true);
@@ -189,8 +181,7 @@ public final class UpgradeMenu {
                 b.setDisabled(false);
                 b.setStyle(skin.get("upgrade", TextButton.TextButtonStyle.class));
                 b.addListener(new ClickListener() {
-                    @Override
-                    public void clicked(InputEvent event, float x, float y) {
+                    @Override public void clicked(InputEvent event, float x, float y) {
                         applyUpgrade(option);
                     }
                 });
@@ -198,21 +189,20 @@ public final class UpgradeMenu {
             upgradeTable.add(b).expandX().fillX().height(56).pad(6).center().row();
         }
 
-// If player can't afford any upgrade, show skip button
         if (!canAfford) {
             TextButton skipBtn = new TextButton("Skip", skin, "upgrade");
-            skipBtn.pad(16, 0, 16, 0);
+            skipBtn.pad(2, 0, 5, 0);
             skipBtn.getLabel().setFontScale(1.1f);
             skipBtn.addListener(new ClickListener() {
-                @Override
-                public void clicked(InputEvent event, float x, float y) {
+                @Override public void clicked(InputEvent event, float x, float y) {
                     Gdx.app.log("UpgradeMenu", "Skip button clicked");
                     EventBus.post(new GameEvent(GameEventType.UPGRADE_SELECTED, "SKIP"));
                     hide();
                 }
             });
-            upgradeTable.add(skipBtn).expandX().fillX().height(56).pad(6).center().row();
+            skipButtonTable.add(skipBtn).width(250).height(25).padTop(-200f).center().row();
         }
+
         upgradeTable.pack();
         upgradeTable.validate();
     }
