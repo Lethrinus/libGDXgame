@@ -1,7 +1,7 @@
 # libGDXgame
 ***SEN3006 - Software Architecture***
 
-A top-down action game built with libGDX and LWJGL3. Defend the town against waves of goblins, dynamite goblins, and barrel bombers in a procedurally-spawned map!
+Knight’s Crusade is a top-down action game made with libGDX and LWJGL3. You play as a lone knight defending a village against ever-stronger waves of goblins wielding clubs, goblins throwing dynamite, and barrel bombers that detonate on impact. Each run drops you onto a freshly generated map with enemies spawning from different points. As you fight, you collect gold to spend between waves on boosting your health, strength, and speed. Mastering movement, timing your attacks, and dodging incoming blasts is key, since each wave grows more challenging. Simple controls and a straightforward upgrade system make the game easy to start while still offering a deep, satisfying challenge as you push your skills to the limit.
 
 ## Table of Contents
 
