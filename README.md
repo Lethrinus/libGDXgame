@@ -1,2 +1,110 @@
 # libGDXgame
+
+A top-down action game built with libGDX and LWJGL3. Defend the town against waves of goblins, dynamite goblins, and barrel bombers in a procedurally-spawned map!
+
+## Table of Contents
+
+1. [Features](#features)  
+2. [Requirements](#requirements)  
+3. [Getting Started](#getting-started)  
+4. [Running the Game](#running-the-game)  
+5. [Controls](#controls)  
+6. [Architecture](#architecture)  
+7. [Asset Pipeline](#asset-pipeline)  
+8. [Authors & License](#authors--license)
+
+## Features
+
+- **Multiple enemy types** with unique behaviours (goblins, dynamite goblins, barrel bombers)  
+- **A\* pathfinding** and crowd separation (boids-style) for smooth group movement  
+- **Health bars**, knockback, and particle-style effects  
+- **NPC dialogue system** with typing effect and wave prompts  
+- **Waves & spawn manager**, with upgrade menu between waves  
+- **Shaders** for circle-fade foliage and pause-mode greyscale  
+- **Ghost-trail dash** for the player, plus inventory and consumable items
+
  
+# Requirements
+
+- **Java 17** JDK (or newer)  
+- **Gradle 8+**  
+- **libGDX 1.13.1** (desktop LWJGL3 backend)  
+- **Optional:** GraalVM native build tools (if you enable `enableGraalNative`)
+
+## Getting Started
+
+1. Clone the repository:  
+   ```bash
+   git clone https://github.com/lethrinus/libGDXgame.git
+   cd libGDXgame
+
+## Running the Game
+
+### From your IDE
+1. Import the **lwjgl3** (desktop) module into your IDE as a Gradle project.  
+2. In the **lwjgl3** module, locate and run the `Lwjgl3Launcher` main class.
+
+### From the command line
+```bash
+# In the repo root:
+./gradlew desktop:run
+```
+
+## Controls
+
+| Action                | Key(s)            |
+|-----------------------|-------------------|
+| Move                  | W / A / S / D     |
+| Attack                | Left mouse button |
+| Dash                  | F                 |
+| Switch inventory slot | Mouse wheel       |
+| Use selected item     | R                 |
+| Interact with NPC     | E                 |
+| Pause / Resume        | ESC               |
+
+
+ ## Architecture
+
+The code follows a component-style, event-driven design:
+
+- **CoreGame**  
+  Orchestrates game loop, rendering, input, camera, UI, pause, waves, and global event bus.
+
+- **Entities**  
+  - **Player**, **Goblin**, **DynamiteGoblin**, **BarrelBomber**, **NPC**, **GoldBag**  
+  - Inherit from `BaseEnemy` or implement custom behaviour.
+  - Use A\* (`GridPathfinder`), separation, and state machines.
+
+- **Systems & Managers**  
+  - **WaveManager**: controls wave spawning, countdowns, and transitions.  
+  - **SpawnManager**: random spawn-point provider.  
+  - **TileMapRenderer**: loads Tiled map, handles collision layers, shaders.  
+  - **CameraShake**: screen-shake effect.  
+  - **ShaderManager**: builds and caches custom GLSL shaders.
+
+- **UI & Overlays**  
+  - **InventoryHUD**, **GoldCounterUI**, **WaveCounterUI**, **UpgradeMenu**, **PauseManager**, **CountdownOverlay**  
+  - Scene2D for menus and in-game overlays.
+
+- **Design Patterns**  
+  - **Singleton** for `EventBus` (global pub/sub).  
+  - **Factory** (`GameEntityFactory`) to instantiate all entities.  
+  - **Observer** via `GameEventListener` for decoupled event handling.  
+  - **Strategy / State Machine** for enemy behaviors (MOVE / ATTACK / DIE states).
+ 
+  ## Asset Pipeline
+
+- **Tiled** (.tmx) for map design  
+- **libGDX TexturePacker** for sprite atlases  
+- **itch.io “Tiny Swords”** asset pack ([link](https://pixelfrog-assets.itch.io/tiny-swords))
+
+
+## Authors & License
+
+**Authors**  
+  ***SEN3006***
+- Yavuzhan Özbek (2201927) 
+- Ozan Halis Demiralp (2203046) 
+
+**License**  
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
