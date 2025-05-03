@@ -5,14 +5,15 @@ A top-down action game built with libGDX and LWJGL3. Defend the town against wav
 ## Table of Contents
 
 1. [Features](#features)
-2. [Gameplay Video](#gameplayvideo)  
+2. [Gameplay Video](#gameplay-video)  
 3. [Requirements](#requirements)  
 4. [Getting Started](#getting-started)  
 5. [Running the Game](#running-the-game)  
 6. [Controls](#controls)  
 7. [Architecture](#architecture)  
-8. [Asset Pipeline](#asset-pipeline)  
-9. [Authors & License](#authors--license)
+8. [Asset Pipeline](#asset-pipeline)
+9. [Project Report](#project-report)
+10. [Authors & License](#authors--license)
 
 ## Features
 
@@ -111,6 +112,11 @@ The code follows a component-style, event-driven design:
   ***SEN3006***
 - Yavuzhan Özbek (2201927) 
 - Ozan Halis Demiralp (2203046) 
+
+
+##  Project Report
+
+You can read the detailed project report here: [Project Report.pdf](./Project%20Report.pdf)
 
 **License**  
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
