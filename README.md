@@ -4,14 +4,15 @@ A top-down action game built with libGDX and LWJGL3. Defend the town against wav
 
 ## Table of Contents
 
-1. [Features](#features)  
-2. [Requirements](#requirements)  
-3. [Getting Started](#getting-started)  
-4. [Running the Game](#running-the-game)  
-5. [Controls](#controls)  
-6. [Architecture](#architecture)  
-7. [Asset Pipeline](#asset-pipeline)  
-8. [Authors & License](#authors--license)
+1. [Features](#features)
+2. [Gameplay Video](#gameplayvideo)  
+3. [Requirements](#requirements)  
+4. [Getting Started](#getting-started)  
+5. [Running the Game](#running-the-game)  
+6. [Controls](#controls)  
+7. [Architecture](#architecture)  
+8. [Asset Pipeline](#asset-pipeline)  
+9. [Authors & License](#authors--license)
 
 ## Features
 
@@ -23,7 +24,12 @@ A top-down action game built with libGDX and LWJGL3. Defend the town against wav
 - **Shaders** for circle-fade foliage and pause-mode greyscale  
 - **Ghost-trail dash** for the player, plus inventory and consumable items
 
- 
+
+## Gameplay Video 
+
+[Watch the gameplay on YouTube](https://youtu.be/T5TjWVjfiRQ)
+
+
 # Requirements
 
 - **Java 17** JDK (or newer)  
