@@ -247,7 +247,7 @@ public class Player {
         return tileMapRenderer.isCellBush(tileX, tileY);
     }
 
-    private int gold = 17;
+    private int gold = 50;
     public void addGold(int n){ gold += n; }
     public int  getGold(){ return gold; }
 
