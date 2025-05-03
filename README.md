@@ -1,4 +1,5 @@
 # libGDXgame
+***SEN3006 - Software Architecture***
 
 A top-down action game built with libGDX and LWJGL3. Defend the town against waves of goblins, dynamite goblins, and barrel bombers in a procedurally-spawned map!
 
@@ -108,15 +109,16 @@ The code follows a component-style, event-driven design:
 
 ## Authors & License
 
-**Authors**  
-  ***SEN3006***
+**Authors** 
+
 - Yavuzhan Özbek (2201927) 
 - Ozan Halis Demiralp (2203046) 
 
+**License**  
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ##  Project Report
 
 You can read the detailed project report here: [Project Report.pdf](./Project%20Report.pdf)
 
-**License**  
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
